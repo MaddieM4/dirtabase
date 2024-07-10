@@ -1,5 +1,7 @@
 mod digest;
 mod resource;
+mod traits;
+mod memstore;
 
 // use digest::Digest;
 

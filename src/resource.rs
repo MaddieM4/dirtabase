@@ -3,7 +3,8 @@
 
 use crate::digest::Digest;
 
-struct Resource<T> where T: AsRef<[u8]> {
+#[derive(Debug,PartialEq)]
+pub struct Resource<T> where T: AsRef<[u8]> {
     pub digest: Digest,
     pub body: T,
 }
