@@ -3,16 +3,16 @@ use crate::resource::Resource;
 use crate::traits::*;
 use std::collections::HashMap;
 
-type MemResources = HashMap<Digest, String>;
-impl ResourceStore<String> for MemResources {
+type MemResources = HashMap<Digest, Vec<u8>>;
+impl ResourceStore for MemResources {
     type Err = ();
-    fn load(&mut self, d: &Digest) -> Result<Resource<String>, LoadError<Self::Err>> {
+    fn load(&mut self, d: &Digest) -> Result<Resource, LoadError<Self::Err>> {
         match self.get(d) {
             Some(s) => Ok(Resource::from(s.clone())),
             None => Err(LoadError::NotFound),
         }
     }
-    fn save(&mut self, res: Resource<String>) -> Result<(), Self::Err> {
+    fn save(&mut self, res: Resource) -> Result<(), Self::Err> {
         self.insert(res.digest, res.body);
         Ok(()) // Cannot fail
     }

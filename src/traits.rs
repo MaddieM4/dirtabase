@@ -8,11 +8,11 @@ pub enum LoadError<T> {
 }
 
 // A content-addressed store which can load or save Resources.
-pub trait ResourceStore<T> where T: AsRef<[u8]> {
+pub trait ResourceStore {
     type Err;
 
-    fn load(&mut self, d: &Digest) -> Result<Resource<T>, LoadError<Self::Err>>;
-    fn save(&mut self, res: Resource<T>) -> Result<(), Self::Err>;
+    fn load(&mut self, d: &Digest) -> Result<Resource, LoadError<Self::Err>>;
+    fn save(&mut self, res: Resource) -> Result<(), Self::Err>;
 
     // In some implementations, is faster than `load`.
     // Generic implementation relies on `load` however.
