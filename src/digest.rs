@@ -1,7 +1,7 @@
 use sha2::{Digest as UpstreamDigest, Sha256};
 const DIGEST_LENGTH: usize = 256 / 8;
 
-#[derive(Debug,PartialEq,Eq,Hash)]
+#[derive(Clone,Debug,PartialEq,Eq,Hash)]
 pub struct Digest {
     bytes: [u8; DIGEST_LENGTH],
 }

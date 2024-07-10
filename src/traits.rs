@@ -29,7 +29,7 @@ pub trait LabelStore {
     type Err;
 
     fn load(&mut self, label: impl AsRef<[u8]>) -> Result<Digest, LoadError<Self::Err>>;
-    fn save(&mut self, label: impl AsRef<[u8]>, d: Digest) -> Result<(), Self::Err>;
+    fn save(&mut self, label: impl AsRef<[u8]>, d: &Digest) -> Result<(), Self::Err>;
 
     // In some implementations, is faster than `load`.
     // Generic implementation relies on `load` however.
