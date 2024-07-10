@@ -1,4 +1,6 @@
 mod digest;
+mod resource;
+
 // use digest::Digest;
 
 // CAS = Content-addressed store
