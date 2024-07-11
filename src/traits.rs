@@ -28,43 +28,79 @@ pub trait LabelStore {
     }
 }
 
-#[derive(PartialEq,Debug)]
-pub enum StorageError<R,L> where R: ResourceStore, L: LabelStore {
+#[derive(PartialEq, Debug)]
+pub enum StorageError<R, L>
+where
+    R: ResourceStore,
+    L: LabelStore,
+{
     ResourceError(R::Err),
     LabelError(L::Err),
 }
+type StorageResult<T, R, L> = Result<T, StorageError<R, L>>;
 
-type StorageResult<T,R,L> = Result<T, StorageError<R,L>>;
-
-pub struct Storage<R,L> where R: ResourceStore, L: LabelStore {
+pub struct Storage<R, L>
+where
+    R: ResourceStore,
+    L: LabelStore,
+{
     resources: R,
     labels: L,
 }
 
-impl<R,L> Storage<R,L> where R: ResourceStore, L: LabelStore {
+impl<R, L> Storage<R, L>
+where
+    R: ResourceStore,
+    L: LabelStore,
+{
     pub fn new(resources: R, labels: L) -> Self {
-        Storage { resources: resources, labels: labels }
+        Storage {
+            resources: resources,
+            labels: labels,
+        }
     }
 
-    pub fn load(&mut self, label: impl AsRef<[u8]>) -> StorageResult<Option<Vec<u8>>, R,L> {
-        let d = match self.labels.load(label) {
-            Ok(Some(d)) => d,
-            Ok(None) => return Ok(None),
-            Err(e) => return Err(StorageError::LabelError(e)),
-        };
-        match self.resources.load(&d) {
-            Ok(x) => Ok(x.map(|rsc| rsc.body)),
-            Err(e) => Err(StorageError::ResourceError(e))
-        }
+    fn load_resource(&mut self, d: &Digest) -> StorageResult<Option<Resource>, R, L> {
+        Ok(self
+            .resources
+            .load(d)
+            .map_err(|e| StorageError::ResourceError(e))?)
     }
-    pub fn save(&mut self, label: impl AsRef<[u8]>, body: impl Into<Resource>) -> StorageResult<(), R,L> {
+    fn save_resource(&mut self, rsc: &Resource) -> StorageResult<(), R, L> {
+        Ok(self
+            .resources
+            .save(rsc)
+            .map_err(|e| StorageError::ResourceError(e))?)
+    }
+
+    fn load_label(&mut self, label: impl AsRef<[u8]>) -> StorageResult<Option<Digest>, R, L> {
+        Ok(self
+            .labels
+            .load(label)
+            .map_err(|e| StorageError::LabelError(e))?)
+    }
+    fn save_label(&mut self, label: impl AsRef<[u8]>, d: &Digest) -> StorageResult<(), R, L> {
+        Ok(self
+            .labels
+            .save(label, d)
+            .map_err(|e| StorageError::LabelError(e))?)
+    }
+
+    pub fn load(&mut self, label: impl AsRef<[u8]>) -> StorageResult<Option<Vec<u8>>, R, L> {
+        let d = self.load_label(label)?;
+        if let None = d {
+            return Ok(None);
+        }
+        self.load_resource(&d.unwrap())
+            .map(|opt| opt.map(|rsc| rsc.body.clone()))
+    }
+    pub fn save(
+        &mut self,
+        label: impl AsRef<[u8]>,
+        body: impl Into<Resource>,
+    ) -> StorageResult<(), R, L> {
         let rsc: Resource = body.into();
-        if let Err(e) = self.resources.save(&rsc) {
-            return Err(StorageError::ResourceError(e))
-        }
-        if let Err(e) = self.labels.save(label, &rsc.digest) {
-            return Err(StorageError::LabelError(e))
-        }
-        Ok(())
+        self.save_resource(&rsc)?;
+        self.save_label(label, &rsc.digest)
     }
 }
