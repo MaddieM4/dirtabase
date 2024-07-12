@@ -1,14 +1,13 @@
+use serde::{Deserialize, Serialize};
 use sha2::{Digest as UpstreamDigest, Sha256};
 const DIGEST_LENGTH: usize = 256 / 8;
 
-#[derive(Clone,Debug,PartialEq,Eq,Hash)]
-pub struct Digest {
-    bytes: [u8; DIGEST_LENGTH],
-}
+#[derive(Clone,Debug,PartialEq,Eq,Hash, Deserialize,Serialize)]
+pub struct Digest([u8; DIGEST_LENGTH]);
 
 impl Digest {
     pub fn to_hex(&self) -> String {
-        hex::encode(self.bytes)
+        hex::encode(self.0)
     }
 }
 
@@ -17,7 +16,7 @@ impl<T> From<T> for Digest where T: AsRef<[u8]> {
         let mut hasher = Sha256::new();
         hasher.update(item);
         let bytes: [u8; DIGEST_LENGTH] = hasher.finalize().as_slice().try_into().unwrap();
-        Self { bytes: bytes }
+        Self(bytes)
     }
 }
 
