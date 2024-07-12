@@ -1,32 +1,23 @@
 use crate::digest::Digest;
-use crate::resource::Resource;
 use crate::traits::*;
 use std::collections::HashMap;
 
-type MemResources = HashMap<Digest, Vec<u8>>;
-impl ResourceStore for MemResources {
-    type Err = ();
-    fn load(&mut self, d: &Digest) -> Result<Option<Resource>, Self::Err> {
-        Ok(self.get(d).map(|ptr| ptr.into()))
+// Cannot have engine failures, but fits the engine-fallible trait
+impl<K,V> Store<K, V> for HashMap<K,V> where K: Eq + std::hash::Hash + Clone, V: Clone {
+    fn load(&mut self, k: &K) -> StorageRes<&V> {
+        self.get(k).ok_or(StorageErr::NotFound)
     }
-    fn save(&mut self, res: &Resource) -> Result<(), Self::Err> {
-        self.insert(res.digest.clone(), res.body.clone());
+    fn save(&mut self, k: &K, v: &V) -> StorageRes<()> {
+        self.insert(k.clone(), v.clone());
         Ok(()) // Cannot fail
     }
 }
 
 type MemLabels = HashMap<Vec<u8>, Digest>;
-impl LabelStore for MemLabels {
-    type Err = ();
-    fn load(&mut self, label: impl AsRef<[u8]>) -> Result<Option<Digest>, Self::Err> {
-        let k: Vec<u8> = label.as_ref().into();
-        Ok(self.get(&k).map(|ptr| ptr.clone()))
-    }
-    fn save(&mut self, label: impl AsRef<[u8]>, d: &Digest) -> Result<(), Self::Err> {
-        self.insert(label.as_ref().into(), d.clone());
-        Ok(()) // Cannot fail
-    }
-}
+impl LabelStore for MemLabels {}
+
+type MemResources = HashMap<Digest, Vec<u8>>;
+impl ResourceStore for MemResources {}
 
 #[cfg(test)]
 mod test {
@@ -35,35 +26,36 @@ mod test {
     #[test]
     fn resource_round_trip() {
         let mut mr = MemResources::new();
-        let rsc: Resource = "foo".to_string().into();
-        let d = rsc.digest.clone();
-        assert_eq!(mr.load(&d).unwrap(), None);
+        let bytes: Vec<u8> = vec![1,2,3,4];
+        let d: Digest = (&bytes).into();
+
+        assert_eq!(mr.load(&d), Err(StorageErr::NotFound));
         assert_eq!(mr.exists(&d).unwrap(), false);
 
-        mr.save(&rsc).expect("Saving to memory should never fail");
+        mr.save(&d, &bytes).expect("Saving to memory should never fail");
         assert_eq!(mr.exists(&d).unwrap(), true);
-        assert_eq!(mr.load(&d).unwrap(), Some(Resource::from("foo".to_string())));
+        assert_eq!(mr.load(&d).unwrap(), &bytes);
     }
 
     #[test]
     fn label_round_trip() {
         let mut ml = MemLabels::new();
-        let label = "Some label";
+        let label: Vec<u8> = "Some label".into();
         let d: Digest = "foo".into();
-        assert_eq!(ml.load(label).unwrap(), None);
-        assert_eq!(ml.exists(label).unwrap(), false);
+        assert_eq!(ml.load(&label), Err(StorageErr::NotFound));
+        assert_eq!(ml.exists(&label).unwrap(), false);
 
-        ml.save(label, &d).expect("Saving to memory should never fail");
-        assert_eq!(ml.exists(label).unwrap(), true);
-        assert_eq!(ml.load(label).unwrap(), Some(d));
+        ml.save(&label, &d).expect("Saving to memory should never fail");
+        assert_eq!(ml.exists(&label).unwrap(), true);
+        assert_eq!(ml.load(&label).unwrap(), &d);
     }
 
     #[test]
     fn storage() {
         let mut s = Storage::new(MemResources::new(), MemLabels::new());
-        assert_eq!(s.load("some label"), Ok(None));
+        assert_eq!(s.load("some label"), Err(StorageErr::NotFound));
 
         s.save("some label", "some bytes").expect("In-memory save");
-        assert_eq!(s.load("some label").unwrap(), Some(Vec::<u8>::from("some bytes")));
+        assert_eq!(s.load("some label").unwrap(), &Vec::<u8>::from("some bytes"));
     }
 }

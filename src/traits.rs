@@ -1,43 +1,33 @@
 use crate::digest::Digest;
 use crate::resource::Resource;
 
-// A content-addressed store which can load or save Resources.
-pub trait ResourceStore {
-    type Err;
+#[derive(Debug, PartialEq)]
+pub enum StorageErr {
+    NotFound,
+    Engine(String),
+}
+pub type StorageRes<T> = Result<T, StorageErr>;
 
-    fn load(&mut self, d: &Digest) -> Result<Option<Resource>, Self::Err>;
-    fn save(&mut self, res: &Resource) -> Result<(), Self::Err>;
+pub trait Store<K, V> {
+    fn load(&mut self, k: &K) -> StorageRes<&V>;
+    fn save(&mut self, k: &K, v: &V) -> StorageRes<()>;
 
     // In some implementations, is faster than `load`.
     // Generic implementation relies on `load` however.
-    fn exists(&mut self, d: &Digest) -> Result<bool, Self::Err> {
-        Ok(self.load(d)?.is_some())
+    fn exists(&mut self, k: &K) -> StorageRes<bool> {
+        match self.load(k) {
+            Ok(_) => Ok(true),
+            Err(StorageErr::NotFound) => Ok(false),
+            Err(x) => Err(x),
+        }
     }
 }
 
-pub trait LabelStore {
-    type Err;
+pub type Label = Vec<u8>;
+pub type Buffer = Vec<u8>;
 
-    fn load(&mut self, label: impl AsRef<[u8]>) -> Result<Option<Digest>, Self::Err>;
-    fn save(&mut self, label: impl AsRef<[u8]>, d: &Digest) -> Result<(), Self::Err>;
-
-    // In some implementations, is faster than `load`.
-    // Generic implementation relies on `load` however.
-    fn exists(&mut self, label: impl AsRef<[u8]>) -> Result<bool, Self::Err> {
-        Ok(self.load(label)?.is_some())
-    }
-}
-
-#[derive(PartialEq, Debug)]
-pub enum StorageError<R, L>
-where
-    R: ResourceStore,
-    L: LabelStore,
-{
-    ResourceError(R::Err),
-    LabelError(L::Err),
-}
-type StorageResult<T, R, L> = Result<T, StorageError<R, L>>;
+pub trait LabelStore: Store<Label, Digest> {}
+pub trait ResourceStore: Store<Digest, Buffer> {}
 
 pub struct Storage<R, L>
 where
@@ -60,47 +50,33 @@ where
         }
     }
 
-    fn load_resource(&mut self, d: &Digest) -> StorageResult<Option<Resource>, R, L> {
-        Ok(self
-            .resources
-            .load(d)
-            .map_err(|e| StorageError::ResourceError(e))?)
+    fn load_resource(&mut self, d: &Digest) -> StorageRes<&Buffer> {
+        self.resources.load(d)
     }
-    fn save_resource(&mut self, rsc: &Resource) -> StorageResult<(), R, L> {
-        Ok(self
-            .resources
-            .save(rsc)
-            .map_err(|e| StorageError::ResourceError(e))?)
+    fn save_resource(&mut self, d: &Digest, body: &Buffer) -> StorageRes<()> {
+        self.resources.save(d, body)
     }
 
-    fn load_label(&mut self, label: impl AsRef<[u8]>) -> StorageResult<Option<Digest>, R, L> {
-        Ok(self
-            .labels
-            .load(label)
-            .map_err(|e| StorageError::LabelError(e))?)
+    fn load_label(&mut self, label: &Label) -> StorageRes<&Digest> {
+        self.labels.load(label)
     }
-    fn save_label(&mut self, label: impl AsRef<[u8]>, d: &Digest) -> StorageResult<(), R, L> {
-        Ok(self
-            .labels
-            .save(label, d)
-            .map_err(|e| StorageError::LabelError(e))?)
+    fn save_label(&mut self, label: &Label, d: &Digest) -> StorageRes<()> {
+        self.labels.save(label, d)
     }
 
-    pub fn load(&mut self, label: impl AsRef<[u8]>) -> StorageResult<Option<Vec<u8>>, R, L> {
-        let d = self.load_label(label)?;
-        if let None = d {
-            return Ok(None);
-        }
-        self.load_resource(&d.unwrap())
-            .map(|opt| opt.map(|rsc| rsc.body.clone()))
+    pub fn load(&mut self, label: impl AsRef<[u8]>) -> StorageRes<&Buffer> {
+        let label: Label = label.as_ref().into();
+        let digest: Digest = self.load_label(&label)?.clone();
+        self.load_resource(&digest)
     }
     pub fn save(
         &mut self,
         label: impl AsRef<[u8]>,
         body: impl Into<Resource>,
-    ) -> StorageResult<(), R, L> {
+    ) -> StorageRes<()> {
+        let label: Label = label.as_ref().into();
         let rsc: Resource = body.into();
-        self.save_resource(&rsc)?;
-        self.save_label(label, &rsc.digest)
+        self.save_resource(&rsc.digest, &rsc.body)?;
+        self.save_label(&label, &rsc.digest)
     }
 }
