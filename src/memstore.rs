@@ -13,10 +13,10 @@ impl<K,V> Store<K, V> for HashMap<K,V> where K: Eq + std::hash::Hash + Clone, V:
     }
 }
 
-type MemLabels = HashMap<Vec<u8>, Digest>;
+pub type MemLabels = HashMap<Vec<u8>, Digest>;
 impl LabelStore for MemLabels {}
 
-type MemResources = HashMap<Digest, Vec<u8>>;
+pub type MemResources = HashMap<Digest, Vec<u8>>;
 impl ResourceStore for MemResources {}
 
 #[cfg(test)]
@@ -48,14 +48,5 @@ mod test {
         ml.save(&label, &d).expect("Saving to memory should never fail");
         assert_eq!(ml.exists(&label).unwrap(), true);
         assert_eq!(ml.load(&label).unwrap(), &d);
-    }
-
-    #[test]
-    fn storage() {
-        let mut s = Storage::new(MemResources::new(), MemLabels::new());
-        assert_eq!(s.load("some label"), Err(StorageErr::NotFound));
-
-        s.save("some label", "some bytes").expect("In-memory save");
-        assert_eq!(s.load("some label").unwrap(), &Vec::<u8>::from("some bytes"));
     }
 }
