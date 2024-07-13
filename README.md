@@ -49,7 +49,7 @@ Breaking down the parts:
  * `scheme`: Identifies which engine type to use
  * `fullpath`: Engine-specific configuration, including params
  * `ref`: May be a digest or a label
-   * `digest` - a format prefix, a hyphen, and then 64 chars of digest hex
+   * `digest` - "$format-$compression-$hexdigest"
    * `label` - a human-readable mutable label starting in `@`
  * `path`: navigates from `ref` to a file or directory within it
 
@@ -100,7 +100,7 @@ A `dirtabase` DB will happily store "anonymous" Archives, especially as intermed
 
 This is what Labels are for. Labels start with a `@`, so for example, `@layover-upstream` might be a plausible label used by the Layover package manager (time will tell). These are easy to store to, and read from, with `dirtabase` commands. The list of Labels, and which store contents they point to (usually an Archive each), is itself an Archive, with the special constraint that every entry has a path that starts with `@` and prohibits certain special characters.
 
-This "all the Labels" archive needs to be promoted as official for the whole storage backend _somehow_, which is why each backend has a teeny tiny piece of "rootdata" consisting of a `(archive_format, archive_digest)` tuple. This `rootdata` can be updated atomically with compare-and-swap, so modifying the root archive is achieved by the following recipe, which is a form of optimistic concurrency:
+This "all the Labels" archive needs to be promoted as official for the whole storage backend _somehow_, which is why each backend has a teeny tiny piece of "rootdata" consisting of a `(format, compression, digest)` tuple. This `rootdata` can be updated atomically with compare-and-swap, so modifying the root archive is achieved by the following recipe, which is a form of optimistic concurrency:
 
 1. Load and parse the current root archive
 2. Modify as you need
@@ -109,6 +109,8 @@ This "all the Labels" archive needs to be promoted as official for the whole sto
   * Only works if `rootdata` is what you found during Step 1.
   * If it works, you're done!
   * If it fails, go back to Step 1 and try again.
+
+Why optimistic concurrency? Because we support a variety of storage engines, many of them on-disk, with a variety of underlying semantics and deadlock potential. That's simpler to do right and fast by using an optimistic concurrency model to absolutely minimize the critical section. Now, it does have potential perf penalties with a lot of competing writers that are all living in Retry Hell, but in expected use dynamics, it's a _lot_ easier to tolerate than long-lasting locks.
 
 ### Engine Storage (CAS)
 
