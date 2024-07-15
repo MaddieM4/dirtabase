@@ -1,8 +1,11 @@
 use crate::digest::Digest;
 use crate::archive::{Format,Compression};
 
-pub struct RootData {
-    format: Format,
-    compression: Compression,
-    digest: Digest,
+#[derive(Debug,PartialEq,Clone)]
+pub struct Spec {
+    pub format: Format,
+    pub compression: Compression,
+    pub digest: Digest,
 }
+
+pub type RootData = Option<Spec>;

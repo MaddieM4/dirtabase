@@ -13,8 +13,8 @@ pub trait Store {
     fn load(&mut self, d: &Digest) -> StorageRes<&Buffer>;
     fn save(&mut self, d: &Digest, b: &Buffer) -> StorageRes<()>;
 
-    fn read_root(&mut self) -> StorageRes<&RootData>;
-    fn replace_root(&mut self, previous: &RootData, next: &RootData) -> StorageRes<bool>;
+    fn read_root(&mut self) -> StorageRes<RootData>;
+    fn replace_root(&mut self, previous: RootData, next: RootData) -> StorageRes<bool>;
 
     // In some implementations, is faster than `load`.
     // Generic implementation relies on `load` however.

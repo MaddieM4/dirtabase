@@ -1,13 +1,13 @@
 use serde::{Deserialize,Serialize};
 
-#[derive(PartialEq,Debug,Serialize,Deserialize)]
+#[derive(PartialEq,Debug,Clone,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]
 pub enum Format {
     File,
     JSON,
 }
 
-#[derive(PartialEq,Debug,Serialize,Deserialize)]
+#[derive(PartialEq,Debug,Clone,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]
 pub enum Compression {
     Plain,

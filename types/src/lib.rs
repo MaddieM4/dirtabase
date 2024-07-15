@@ -8,4 +8,4 @@ mod storage;
 pub use crate::storage::*;
 
 mod rootdata;
-pub use crate::rootdata::RootData;
+pub use crate::rootdata::*;
