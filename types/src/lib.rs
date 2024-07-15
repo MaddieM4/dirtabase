@@ -1,11 +1,8 @@
 mod digest;
 pub use crate::digest::Digest;
 
-mod archive;
-pub use crate::archive::*;
+mod primitives;
+pub use crate::primitives::*;
 
 mod storage;
 pub use crate::storage::*;
-
-mod rootdata;
-pub use crate::rootdata::*;

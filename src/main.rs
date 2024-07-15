@@ -1,8 +1,4 @@
 mod resource;
-mod traits;
-mod memstore;
-mod storage;
-mod dir;
 
 // use digest::Digest;
 

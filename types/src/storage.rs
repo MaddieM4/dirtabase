@@ -1,5 +1,5 @@
 use crate::digest::Digest;
-use crate::rootdata::RootData;
+use crate::primitives::*;
 
 #[derive(Debug, PartialEq)]
 pub enum StorageErr {
@@ -10,14 +10,13 @@ pub type StorageRes<T> = Result<T, StorageErr>;
 pub type Buffer = Vec<u8>;
 
 pub trait Store {
+    // Low-level mandatory API
     fn load(&mut self, d: &Digest) -> StorageRes<&Buffer>;
     fn save(&mut self, d: &Digest, b: &Buffer) -> StorageRes<()>;
-
     fn read_root(&mut self) -> StorageRes<RootData>;
     fn replace_root(&mut self, previous: RootData, next: RootData) -> StorageRes<bool>;
 
-    // In some implementations, is faster than `load`.
-    // Generic implementation relies on `load` however.
+    // Higher-level ergonomic API
     fn exists(&mut self, d: &Digest) -> StorageRes<bool> {
         match self.load(d) {
             Ok(_) => Ok(true),
