@@ -7,7 +7,6 @@ pub enum StorageErr {
     Engine(String),
 }
 pub type StorageRes<T> = Result<T, StorageErr>;
-pub type Buffer = Vec<u8>;
 
 pub trait Store {
     // Low-level mandatory API

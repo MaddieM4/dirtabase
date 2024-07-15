@@ -1,6 +1,22 @@
 use crate::digest::Digest;
 use serde::{Deserialize,Serialize};
 
+pub type Buffer = Vec<u8>;
+
+#[derive(Debug,PartialEq)]
+pub struct Resource {
+    pub digest: Digest,
+    pub body: Buffer,
+}
+impl<T> From<T> for Resource where T: AsRef<[u8]> {
+    fn from(item: T) -> Self {
+        Resource {
+            digest: Digest::from(&item),
+            body: item.as_ref().into(),
+        }
+    }
+}
+
 #[derive(PartialEq,Debug,Clone,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]
 pub enum Format {
@@ -42,7 +58,24 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_roundtrip() -> serde_json::Result<()> {
+    fn resource_from_static_str() {
+        let s = "Hello world!";
+        let r = Resource::from(s);
+        assert_eq!(r.body, Vec::<u8>::from(s));
+        assert_eq!(r.digest.to_hex(), Digest::from(s).to_hex());
+    }
+
+    #[test]
+    fn resource_from_string() {
+        let s = "Hello world!".to_string();
+        let sc: Buffer = s.clone().into();
+        let r = Resource::from(s); // Moves s
+        assert_eq!(r.body, sc);
+        assert_eq!(r.digest.to_hex(), Digest::from(&sc).to_hex());
+    }
+
+    #[test]
+    fn serde_archive() -> serde_json::Result<()> {
         let archive: Vec<ArchiveEntry> = vec![
             ArchiveEntry {
                 path: "foo/bar.txt".into(),
