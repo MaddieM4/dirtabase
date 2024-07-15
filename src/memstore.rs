@@ -1,4 +1,4 @@
-use crate::digest::Digest;
+use types::Digest;
 use crate::traits::*;
 use std::collections::HashMap;
 

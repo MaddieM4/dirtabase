@@ -1,4 +1,3 @@
-mod digest;
 mod resource;
 mod traits;
 mod memstore;

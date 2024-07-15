@@ -1,7 +1,7 @@
 // A resource is a series of bytes that can be stored or retrieved
 // from a content-addressed store. It always has a precomputed digest.
 
-use crate::digest::Digest;
+use types::Digest;
 
 #[derive(Debug,PartialEq)]
 pub struct Resource {

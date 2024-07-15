@@ -1,16 +1,9 @@
 [package]
-name = "dirtabase"
+name = "types"
 version = "0.1.0"
 edition = "2021"
-
-[workspace]
-members = [
-  "types",
-]
 
 [dependencies]
 hex = "0.4.3"
 serde = { version="1.0.204", features=["derive"] }
-serde_json = "1.0.120"
 sha2 = "0.10.8"
-types = { path = "./types" }

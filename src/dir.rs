@@ -1,5 +1,5 @@
 use serde::{Deserialize,Serialize};
-use crate::digest::Digest;
+use types::Digest;
 
 #[derive(PartialEq,Debug,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]

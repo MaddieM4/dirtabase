@@ -1,6 +1,13 @@
 use crate::traits::*;
-use crate::digest::Digest;
+use types::Digest;
 use crate::resource::Resource;
+use crate::dir::{Format, Compression};
+
+pub struct RootData {
+    pub format: Format,
+    pub compression: Compression,
+    pub digest: Digest,
+}
 
 pub struct Storage<R, L>
 where
