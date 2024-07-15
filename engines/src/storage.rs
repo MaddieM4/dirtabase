@@ -1,5 +1,4 @@
-use crate::digest::Digest;
-use crate::primitives::*;
+use types::*;
 
 #[derive(Debug, PartialEq)]
 pub enum StorageErr {

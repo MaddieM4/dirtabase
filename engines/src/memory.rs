@@ -1,4 +1,5 @@
 use types::*;
+use crate::storage::*;
 use std::collections::HashMap;
 
 pub struct Memory {
@@ -7,7 +8,7 @@ pub struct Memory {
 }
 
 impl Memory {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { root: None, cas: HashMap::new() }
     }
 }
