@@ -1,4 +1,7 @@
 # Vim
 *.sw[op]
 
+# Temp files
+.dirtabase_db
+
 /target
