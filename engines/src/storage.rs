@@ -18,4 +18,10 @@ pub trait Store {
             Err(x) => Err(x),
         }
     }
+
+    fn store(&mut self, rsc: impl Into<Resource>) -> Result<Resource, Self::Error> {
+        let rsc: Resource = rsc.into();
+        self.save(&rsc.digest, &rsc.body)?;
+        Ok(rsc)
+    }
 }

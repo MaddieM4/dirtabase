@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cc"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "324c74f2155653c90b04f25b2a47a8a631360cb908f92a772695f430c7e31052"
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -50,6 +56,7 @@ dependencies = [
 name = "dirtabase"
 version = "0.1.0"
 dependencies = [
+ "engines",
  "hex",
  "serde",
  "serde_json",
@@ -61,7 +68,19 @@ dependencies = [
 name = "engines"
 version = "0.1.0"
 dependencies = [
+ "file-lock",
+ "serde_json",
  "types",
+]
+
+[[package]]
+name = "file-lock"
+version = "2.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "040b48f80a749da50292d0f47a1e2d5bf1d772f52836c07f64bfccc62ba6e664"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]

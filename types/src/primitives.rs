@@ -48,9 +48,9 @@ impl Attr {
 
 #[derive(PartialEq,Debug,Serialize,Deserialize)]
 pub struct ArchiveEntry {
-    path: String,
-    spec: Spec,
-    attrs: Vec<Attr>,
+    pub path: String,
+    pub spec: Spec,
+    pub attrs: Vec<Attr>,
 }
 
 #[cfg(test)]
