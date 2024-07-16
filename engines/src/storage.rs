@@ -1,24 +1,20 @@
 use types::*;
 
-#[derive(Debug, PartialEq)]
-pub enum StorageErr {
-    NotFound,
-    Engine(String),
-}
-pub type StorageRes<T> = Result<T, StorageErr>;
-
 pub trait Store {
+    type Error;
+    // type Result<T> = Result<T, Self::Error>;
+
     // Low-level mandatory API
-    fn load(&mut self, d: &Digest) -> StorageRes<&Buffer>;
-    fn save(&mut self, d: &Digest, b: &Buffer) -> StorageRes<()>;
-    fn read_root(&mut self) -> StorageRes<RootData>;
-    fn replace_root(&mut self, previous: RootData, next: RootData) -> StorageRes<bool>;
+    fn load(&mut self, d: &Digest) -> Result<Option<Buffer>, Self::Error>;
+    fn save(&mut self, d: &Digest, b: &Buffer) -> Result<(), Self::Error>;
+    fn read_root(&mut self) -> Result<RootData, Self::Error>;
+    fn replace_root(&mut self, previous: RootData, next: RootData) -> Result<bool, Self::Error>;
 
     // Higher-level ergonomic API
-    fn exists(&mut self, d: &Digest) -> StorageRes<bool> {
+    fn exists(&mut self, d: &Digest) -> Result<bool,Self::Error> {
         match self.load(d) {
-            Ok(_) => Ok(true),
-            Err(StorageErr::NotFound) => Ok(false),
+            Ok(Some(_)) => Ok(true),
+            Ok(None) => Ok(false),
             Err(x) => Err(x),
         }
     }
