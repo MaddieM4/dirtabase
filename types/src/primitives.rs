@@ -44,6 +44,9 @@ impl Attr {
     pub fn new(name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         Self(name.as_ref().into(), value.as_ref().into())
     }
+
+    pub fn name(&self) -> &str { &self.0 }
+    pub fn value(&self) -> &str { &self.1 }
 }
 pub type Attrs = Vec<Attr>;
 

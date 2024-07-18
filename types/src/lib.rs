@@ -12,3 +12,4 @@ pub use crate::resource::{
 };
 
 mod stream;
+pub use crate::stream::*;
