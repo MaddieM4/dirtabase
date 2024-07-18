@@ -45,12 +45,13 @@ impl Attr {
         Self(name.as_ref().into(), value.as_ref().into())
     }
 }
+pub type Attrs = Vec<Attr>;
 
 #[derive(PartialEq,Debug,Clone,Serialize,Deserialize)]
 pub struct ArchiveEntry {
     pub path: String,
     pub spec: Spec,
-    pub attrs: Vec<Attr>,
+    pub attrs: Attrs,
 }
 
 #[derive(PartialEq,Debug,Clone,Serialize,Deserialize)]
