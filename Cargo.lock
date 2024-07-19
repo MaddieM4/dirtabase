@@ -59,9 +59,11 @@ dependencies = [
  "engines",
  "generic-array 1.1.0",
  "hex",
+ "indoc",
  "serde",
  "serde_json",
  "sha2",
+ "tempdir",
  "types",
 ]
 
