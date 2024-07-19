@@ -42,6 +42,14 @@ impl Sink for DebugSink<'_> {
     }
 }
 
+fn normal_join(base: impl AsRef<Path>, rel: impl AsRef<Path>) -> PathBuf {
+    let rel = rel.as_ref();
+    base.as_ref().join(match rel.is_absolute() {
+        true => rel.strip_prefix("/").expect("Could not de-absolute rel path"),
+        false => rel,
+    })
+}
+
 // Creates a directory within a real filesystem.
 // Builds fresh in a temp directory.
 // Finalizing does an atomic rename of temp dir to target location.
@@ -58,16 +66,7 @@ impl OsdirSink {
     }
 
     fn normalize(&self, path: impl AsRef<Path>) -> PathBuf {
-        let path = path.as_ref();
-        dbg!(path);
-        let path = match path.is_absolute() {
-            true => path
-                .strip_prefix("/")
-                .expect("failed to strip root from path"),
-            false => path,
-        };
-        dbg!(path);
-        self.tmp.path().join(path)
+        normal_join(self.tmp.path(), path)
     }
 }
 impl Sink for OsdirSink {
@@ -97,6 +96,27 @@ impl Sink for OsdirSink {
         std::fs::rename(src, self.dest)?;
         Ok(())
     }
+}
+
+fn _osdir_visit<S>(base: &Path, rel: &Path, mut sink: S) -> Result<S> where S: Sink {
+    let real_path = normal_join(base, rel);
+    for entry in std::fs::read_dir(real_path)? {
+        let dir = entry?;
+        let virt_path = rel.join(&dir.file_name());
+        let file_type = dir.file_type()?;
+        if file_type.is_dir() {
+            sink = sink.send_dir(&virt_path, vec![])?;
+            sink = _osdir_visit(&base, &virt_path, sink)?;
+        } else if file_type.is_file() {
+            let reader = std::fs::File::open(&dir.path())?;
+            sink = sink.send_file(virt_path, vec![], reader)?
+        }
+    }
+    Ok(sink)
+}
+
+pub fn osdir_src(base: impl AsRef<Path>, sink: impl Sink) -> Result<()> {
+    _osdir_visit(base.as_ref(), Path::new("/"), sink)?.finalize()
 }
 
 #[cfg(test)]
@@ -167,6 +187,24 @@ mod test {
         assert_eq!(
             std::fs::read(dest.join("hello/world.txt"))?,
             Vec::<u8>::from("Some text")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn _osdir_src() -> Result<()> {
+        let mut s = String::new();
+        osdir_src("./fixture", DebugSink(&mut s))?;
+        assert_eq!(
+            &s,
+            indoc! {"
+            FILE /file_at_root.txt
+              Length: 37
+            DIR /dir1
+            DIR /dir1/dir2
+            FILE /dir1/dir2/nested.txt
+              Length: 41
+        "}
         );
         Ok(())
     }
