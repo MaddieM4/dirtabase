@@ -192,7 +192,7 @@ mod test {
     }
 
     #[test]
-    fn _osdir_src() -> Result<()> {
+    fn test_osdir_src() -> Result<()> {
         let mut s = String::new();
         osdir_src("./fixture", DebugSink(&mut s))?;
         assert_eq!(
@@ -205,6 +205,23 @@ mod test {
             FILE /dir1/dir2/nested.txt
               Length: 41
         "}
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn osdir_round_trip() -> Result<()> {
+        let dest = Path::new("/tmp/test_osdir_round_trip");
+        if dest.exists() {
+            std::fs::remove_dir_all(dest)?;
+        }
+
+        osdir_src("./fixture", OsdirSink::new(dest))?;
+        assert!(dest.exists());
+        assert!(dest.join("dir1/dir2/nested.txt").exists());
+        assert_eq!(
+            std::fs::read(dest.join("file_at_root.txt"))?,
+            std::fs::read("./fixture/file_at_root.txt")?,
         );
         Ok(())
     }
