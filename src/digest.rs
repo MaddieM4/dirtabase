@@ -51,6 +51,11 @@ impl<C> DigestAny<C> where C: Cruncher {
     pub fn to_bytes(&self) -> &C::Output {
         &self.bytes
     }
+
+    /// Import from some external source. Be careful to preserve invariants!
+    pub fn from_bytes(bytes: C::Output) -> Self {
+        Self { bytes: bytes }
+    }
 }
 impl<T,C> From<T> for DigestAny<C> where C: Cruncher, T: AsRef<[u8]> {
     fn from(data: T) -> Self {
@@ -63,6 +68,11 @@ impl<C> ToHex for DigestAny<C> where C: Cruncher, C::Output: ToHex {
     }
     fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
         self.bytes.encode_hex_upper()
+    }
+}
+impl<C> std::fmt::Debug for DigestAny<C> where C: Cruncher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Digest({:?})", self.to_hex())
     }
 }
 

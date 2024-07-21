@@ -44,7 +44,7 @@ impl Simple {
             Ok(bytes) => Ok(bytes),
             Err(e) => match e.kind() {
                 NotFound => Ok(vec![]),
-                _ => Err(e)?,
+                _ => Err(e),
             }
         }
     }
@@ -58,15 +58,62 @@ impl Simple {
         }
     }
 
+    fn cas_path(&self, digest: &Digest) -> PathBuf {
+        self.root.join("cas").join(digest.to_hex())
+    }
 
-    pub fn cas_read(&self, _digest: &Digest) {}
-    pub fn cas_write(&self) -> () {}
+    pub fn cas_read(&self, digest: &Digest) -> io::Result<Option<std::fs::File>> {
+        let path = self.cas_path(digest);
+        match std::fs::File::open(path) {
+            Ok(f) => Ok(Some(f)),
+            Err(e) => match e.kind() {
+                NotFound => Ok(None),
+                _ => Err(e)
+            }
+        }
+    }
+    pub fn cas_write(&self) -> io::Result<CasWriter> {
+        CasWriter::new(&self.root)
+    }
+}
+
+use sha2::Digest as _;
+pub struct CasWriter {
+    hash: sha2::Sha256, // TODO: Improve this :(
+    file: NamedTempFile,
+    root: PathBuf,
+}
+impl CasWriter {
+    fn new(root: impl AsRef<Path>) -> io::Result<Self> {
+        let dir = root.as_ref().join("cas");
+        Ok(Self {
+            hash: sha2::Sha256::new(),
+            file: NamedTempFile::new_in(&dir)?,
+            root: dir.into(),
+        })
+    }
+    fn finish(self) -> io::Result<Digest> {
+        let raw = self.hash.finalize();
+        let d = Digest::from_bytes(raw.as_slice().try_into().unwrap());
+        self.file.persist(self.root.join(d.to_hex()))?;
+        Ok(d)
+    }
+}
+impl Write for CasWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.hash.update(buf);
+        self.file.write(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use tempdir::TempDir;
+    use std::io::Read;
 
     #[test]
     fn ref_read() -> io::Result<()> {
@@ -100,4 +147,46 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn cas_read() -> io::Result<()> {
+        let dir = TempDir::new("dirtabase")?;
+        let store = Simple::new(&dir)?;
+        let d: Digest = "some text".into();
+        let path = dir.path().join("cas").join(d.to_hex());
+
+        // No cas file, treated as no IO error but option is None
+        assert!(store.cas_read(&d)?.is_none());
+
+        // Artificially inject file
+        std::fs::write(path, b"blah blah blah")?;
+        let mut buf: Vec<u8> = vec![];
+        store.cas_read(&d)?.expect("file exists now").read_to_end(&mut buf)?;
+        assert_eq!(buf, b"blah blah blah");
+
+        Ok(())
+    }
+
+    #[test]
+    fn cas_write() -> io::Result<()> {
+        let dir = TempDir::new("dirtabase")?;
+        let store = Simple::new(&dir)?;
+        let contents = "some text";
+        let d: Digest = contents.into();
+        let path = dir.path().join("cas").join(d.to_hex());
+
+        // No cas file yet
+        assert!(!path.exists());
+
+        // Store into the CAS
+        let mut cw = store.cas_write()?;
+        cw.write_all(contents.as_ref())?;
+        assert!(!path.exists()); // EVEN NOW, DOES NOT EXIST AT FINAL LOCATION!
+        let d2 = cw.finish()?;
+
+        // Exists with expected contents
+        assert_eq!(String::from_utf8(std::fs::read(path)?).unwrap(), contents);
+        assert_eq!(d.to_hex(), d2.to_hex());
+
+        Ok(())
+    }
 }
