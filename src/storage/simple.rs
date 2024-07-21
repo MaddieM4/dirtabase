@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! .dirtabase_db
-//!  - ref/
+//!  - lab/
 //!    - @foo (arbitrary bytes, conventionally reference a CAS digest+format+compression)
 //!    - @bar
 //!    - tmp.27sd91 (tempfile that will be atomically renamed)
@@ -18,6 +18,7 @@
 //! What's important is that the Storage layer is totally parsing-ignorant.
 //! This allows the many implementations to be simpler to write and understand
 //! without thinking about too many distant moving parts.
+
 use crate::storage::core::*;
 use tempfile::NamedTempFile;
 use std::io::Write;
@@ -29,18 +30,18 @@ pub struct Simple {
 impl Simple {
     pub fn new(path: impl AsRef<Path>) -> io::Result<Self> {
         let buf: PathBuf = path.as_ref().into();
-        std::fs::create_dir_all(Path::new(&buf).join("ref"))?;
+        std::fs::create_dir_all(Path::new(&buf).join("lab"))?;
         std::fs::create_dir_all(Path::new(&buf).join("cas"))?;
         Ok(Self { root: buf })
     }
 
-    fn ref_path(&self, name: impl AsRef<str>) -> PathBuf {
-        let rn = RefName::new(name.as_ref()).expect("Invalid ref name");
-        self.root.join("ref").join(rn.as_ref())
+    fn lab_path(&self, name: impl AsRef<str>) -> PathBuf {
+        let label = Label::new(name.as_ref()).expect("Invalid label name");
+        self.root.join("lab").join(label.as_path())
     }
 
-    pub fn ref_read(&self, name: impl AsRef<str>) -> io::Result<Vec<u8>> {
-        match std::fs::read(self.ref_path(name)) {
+    pub fn lab_read(&self, name: impl AsRef<str>) -> io::Result<Vec<u8>> {
+        match std::fs::read(self.lab_path(name)) {
             Ok(bytes) => Ok(bytes),
             Err(e) => match e.kind() {
                 NotFound => Ok(vec![]),
@@ -49,8 +50,8 @@ impl Simple {
         }
     }
 
-    pub fn ref_write(&self, name: impl AsRef<str>, value: impl AsRef<[u8]>) -> io::Result<()> { let dest = self.ref_path(name);
-        let mut file = NamedTempFile::new_in(self.root.join("ref"))?;
+    pub fn lab_write(&self, name: impl AsRef<str>, value: impl AsRef<[u8]>) -> io::Result<()> { let dest = self.lab_path(name);
+        let mut file = NamedTempFile::new_in(self.root.join("lab"))?;
         file.write_all(value.as_ref())?;
         match file.persist(dest) {
             Ok(_) => Ok(()),
@@ -116,32 +117,32 @@ mod test {
     use std::io::Read;
 
     #[test]
-    fn ref_read() -> io::Result<()> {
+    fn lab_read() -> io::Result<()> {
         let dir = TempDir::new("dirtabase")?;
         let store = Simple::new(&dir)?;
-        let path = dir.path().join("ref/@foo");
+        let path = dir.path().join("lab/@foo");
 
-        // No ref file but not an error, represented as empty array
-        assert_eq!(store.ref_read("@foo")?, vec![0;0]);
+        // No label file but not an error, represented as empty array
+        assert_eq!(store.lab_read("@foo")?, vec![0;0]);
 
         // Artificially inject some contents
         std::fs::write(path, b"Some bytes")?;
-        assert_eq!(store.ref_read("@foo")?, b"Some bytes");
+        assert_eq!(store.lab_read("@foo")?, b"Some bytes");
 
         Ok(())
     }
 
     #[test]
-    fn ref_write() -> io::Result<()> {
+    fn lab_write() -> io::Result<()> {
         let dir = TempDir::new("dirtabase")?;
         let store = Simple::new(&dir)?;
-        let path = dir.path().join("ref/@foo");
+        let path = dir.path().join("lab/@foo");
 
         // Prior to write, file doesn't exist
         assert!(!path.exists());
 
         // After writing, contains the expected contents
-        store.ref_write("@foo", b"Some contents")?;
+        store.lab_write("@foo", b"Some contents")?;
         assert_eq!(std::fs::read(path)?, b"Some contents");
 
         Ok(())
