@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! .dirtabase_db
-//!  - lab/
+//!  - labels/
 //!    - @foo (arbitrary bytes, conventionally reference a CAS digest+format+compression)
 //!    - @bar
 //!    - tmp.27sd91 (tempfile that will be atomically renamed)
@@ -71,28 +71,16 @@ pub fn storage(path: impl AsRef<Path>) -> io::Result<Simple> {
     Simple::new(path)
 }
 
-pub struct Simple {
-    root: PathBuf,
-    cas: SimpleCAS,
-}
-
-impl Simple {
-    pub fn new(path: impl AsRef<Path>) -> io::Result<Self> {
-        let buf: PathBuf = path.as_ref().into();
-        std::fs::create_dir_all(Path::new(&buf).join("lab"))?;
-        let cas = SimpleCAS::new(&buf.join("cas"))?;
-        Ok(Self { root: buf, cas: cas })
+pub struct Labels(PathBuf);
+impl Labels {
+    fn new(path: impl AsRef<Path>) -> io::Result<Self> {
+        let path: PathBuf = path.as_ref().into();
+        std::fs::create_dir_all(&path)?;
+        Ok(Self(path))
     }
 
-    pub fn cas(&self) -> &SimpleCAS { &self.cas }
-
-    fn lab_path(&self, name: impl AsRef<str>) -> PathBuf {
-        let label = Label::new(name.as_ref()).expect("Invalid label name");
-        self.root.join("lab").join(label.as_path())
-    }
-
-    pub fn lab_read(&self, name: impl AsRef<str>) -> io::Result<Vec<u8>> {
-        match std::fs::read(self.lab_path(name)) {
+    pub fn read(&self, name: impl AsRef<str>) -> io::Result<Vec<u8>> {
+        match std::fs::read(&self.0.join(name.as_ref())) {
             Ok(bytes) => Ok(bytes),
             Err(e) => match e.kind() {
                 NotFound => Ok(vec![]),
@@ -101,14 +89,27 @@ impl Simple {
         }
     }
 
-    pub fn lab_write(&self, name: impl AsRef<str>, value: impl AsRef<[u8]>) -> io::Result<()> { let dest = self.lab_path(name);
-        let mut file = NamedTempFile::new_in(self.root.join("lab"))?;
+    pub fn write(&self, name: impl AsRef<str>, value: impl AsRef<[u8]>) -> io::Result<()> {
+        let dest = &self.0.join(name.as_ref());
+        let mut file = NamedTempFile::new_in(&self.0)?;
         file.write_all(value.as_ref())?;
         match file.persist(dest) {
             Ok(_) => Ok(()),
             Err(pe) => Err(pe.error),
         }
     }
+}
+
+pub struct Simple(SimpleCAS, Labels);
+impl Simple {
+    pub fn new(path: impl AsRef<Path>) -> io::Result<Self> {
+        let buf: PathBuf = path.as_ref().into();
+        let cas = SimpleCAS::new(&buf.join("cas"))?;
+        let labels = Labels::new(&buf.join("labels"))?;
+        Ok(Self(cas, labels))
+    }
+    pub fn cas(&self) -> &SimpleCAS { &self.0 }
+    pub fn labels(&self) -> &Labels { &self.1 }
 }
 
 #[cfg(test)]
@@ -121,14 +122,14 @@ mod test {
     fn lab_read() -> io::Result<()> {
         let dir = TempDir::new("dirtabase")?;
         let store = Simple::new(&dir)?;
-        let path = dir.path().join("lab/@foo");
+        let path = dir.path().join("labels/@foo");
 
         // No label file but not an error, represented as empty array
-        assert_eq!(store.lab_read("@foo")?, vec![0;0]);
+        assert_eq!(store.labels().read("@foo")?, vec![0;0]);
 
         // Artificially inject some contents
         std::fs::write(path, b"Some bytes")?;
-        assert_eq!(store.lab_read("@foo")?, b"Some bytes");
+        assert_eq!(store.labels().read("@foo")?, b"Some bytes");
 
         Ok(())
     }
@@ -137,13 +138,13 @@ mod test {
     fn lab_write() -> io::Result<()> {
         let dir = TempDir::new("dirtabase")?;
         let store = Simple::new(&dir)?;
-        let path = dir.path().join("lab/@foo");
+        let path = dir.path().join("labels/@foo");
 
         // Prior to write, file doesn't exist
         assert!(!path.exists());
 
         // After writing, contains the expected contents
-        store.lab_write("@foo", b"Some contents")?;
+        store.labels().write("@foo", b"Some contents")?;
         assert_eq!(std::fs::read(path)?, b"Some contents");
 
         Ok(())
