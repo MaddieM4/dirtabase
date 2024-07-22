@@ -1,4 +1,4 @@
-//! Simple datastore model
+//! Simple datastore model.
 //!
 //! This is stored as an OS directory with a structure like:
 //!
@@ -22,18 +22,69 @@
 use crate::storage::core::*;
 use tempfile::NamedTempFile;
 use std::io::Write;
+use sha2::Digest as _;
+
+/// Content-addressed storage in the Simple DB format.
+pub struct SimpleCAS(PathBuf);
+impl SimpleCAS {
+    fn new(path: impl AsRef<Path>) -> io::Result<Self> {
+        let path: PathBuf = path.as_ref().into();
+        std::fs::create_dir_all(&path)?;
+        Ok(Self(path))
+    }
+}
+impl CAS for SimpleCAS {
+    type Reader = std::fs::File;
+
+    fn read(&self, digest: &Digest) -> io::Result<Option<Self::Reader>> {
+        let path = self.0.join(digest.to_hex()); match std::fs::File::open(path) {
+            Ok(f) => Ok(Some(f)),
+            Err(e) => match e.kind() {
+                NotFound => Ok(None),
+                _ => Err(e)
+            }
+        }
+    }
+    fn write(&self, mut reader: impl io::Read) -> io::Result<Digest> {
+        let mut writer = NamedTempFile::new_in(&self.0)?;
+        let mut hash = sha2::Sha256::new();
+        // Copy data while building digest
+        let mut buf = [0; 4096];
+        loop {
+            let n = reader.read(&mut buf)?;
+            if n == 0 {
+                break
+            }
+            let bytes = &buf[..n];
+            hash.update(bytes);
+            writer.write(bytes)?;
+        }
+        // Finish up
+        let raw = hash.finalize();
+        let d = Digest::from_bytes(raw.as_slice().try_into().unwrap());
+        writer.persist(self.0.join(d.to_hex()))?;
+        Ok(d)
+    }
+}
+
+pub fn storage(path: impl AsRef<Path>) -> io::Result<Simple> {
+    Simple::new(path)
+}
 
 pub struct Simple {
     root: PathBuf,
+    cas: SimpleCAS,
 }
 
 impl Simple {
     pub fn new(path: impl AsRef<Path>) -> io::Result<Self> {
         let buf: PathBuf = path.as_ref().into();
         std::fs::create_dir_all(Path::new(&buf).join("lab"))?;
-        std::fs::create_dir_all(Path::new(&buf).join("cas"))?;
-        Ok(Self { root: buf })
+        let cas = SimpleCAS::new(&buf.join("cas"))?;
+        Ok(Self { root: buf, cas: cas })
     }
+
+    pub fn cas(&self) -> &SimpleCAS { &self.cas }
 
     fn lab_path(&self, name: impl AsRef<str>) -> PathBuf {
         let label = Label::new(name.as_ref()).expect("Invalid label name");
@@ -57,56 +108,6 @@ impl Simple {
             Ok(_) => Ok(()),
             Err(pe) => Err(pe.error),
         }
-    }
-
-    fn cas_path(&self, digest: &Digest) -> PathBuf {
-        self.root.join("cas").join(digest.to_hex())
-    }
-
-    pub fn cas_read(&self, digest: &Digest) -> io::Result<Option<std::fs::File>> {
-        let path = self.cas_path(digest);
-        match std::fs::File::open(path) {
-            Ok(f) => Ok(Some(f)),
-            Err(e) => match e.kind() {
-                NotFound => Ok(None),
-                _ => Err(e)
-            }
-        }
-    }
-    pub fn cas_write(&self) -> io::Result<CasWriter> {
-        CasWriter::new(&self.root)
-    }
-}
-
-use sha2::Digest as _;
-pub struct CasWriter {
-    hash: sha2::Sha256, // TODO: Improve this :(
-    file: NamedTempFile,
-    root: PathBuf,
-}
-impl CasWriter {
-    fn new(root: impl AsRef<Path>) -> io::Result<Self> {
-        let dir = root.as_ref().join("cas");
-        Ok(Self {
-            hash: sha2::Sha256::new(),
-            file: NamedTempFile::new_in(&dir)?,
-            root: dir.into(),
-        })
-    }
-    fn finish(self) -> io::Result<Digest> {
-        let raw = self.hash.finalize();
-        let d = Digest::from_bytes(raw.as_slice().try_into().unwrap());
-        self.file.persist(self.root.join(d.to_hex()))?;
-        Ok(d)
-    }
-}
-impl Write for CasWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.hash.update(buf);
-        self.file.write(buf)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.file.flush()
     }
 }
 
@@ -156,12 +157,12 @@ mod test {
         let path = dir.path().join("cas").join(d.to_hex());
 
         // No cas file, treated as no IO error but option is None
-        assert!(store.cas_read(&d)?.is_none());
+        assert!(store.cas().read(&d)?.is_none());
 
         // Artificially inject file
         std::fs::write(path, b"blah blah blah")?;
         let mut buf: Vec<u8> = vec![];
-        store.cas_read(&d)?.expect("file exists now").read_to_end(&mut buf)?;
+        store.cas().read(&d)?.expect("file exists now").read_to_end(&mut buf)?;
         assert_eq!(buf, b"blah blah blah");
 
         Ok(())
@@ -179,10 +180,7 @@ mod test {
         assert!(!path.exists());
 
         // Store into the CAS
-        let mut cw = store.cas_write()?;
-        cw.write_all(contents.as_ref())?;
-        assert!(!path.exists()); // EVEN NOW, DOES NOT EXIST AT FINAL LOCATION!
-        let d2 = cw.finish()?;
+        let d2 = store.cas().write(std::io::Cursor::new(contents))?;
 
         // Exists with expected contents
         assert_eq!(String::from_utf8(std::fs::read(path)?).unwrap(), contents);
