@@ -18,11 +18,43 @@
 //! What's important is that the Storage layer is totally parsing-ignorant.
 //! This allows the many implementations to be simpler to write and understand
 //! without thinking about too many distant moving parts.
+//!
+//! ```
+//! use tempfile::tempdir;
+//! use dirtabase::digest::Digest;
+//! use dirtabase::storage::traits::*;
+//! use dirtabase::storage::simple;
+//!
+//! let dir = tempdir()?;
+//! let store = simple::storage(&dir)?;
+//! let digest = store.cas().write_buf("foo")?;
+//!
+//! assert_eq!(digest.to_hex(), Digest::from("foo").to_hex());
+//! Ok::<(), std::io::Error>(())
+//! ```
 
 use crate::storage::core::*;
 use tempfile::NamedTempFile;
 use std::io::Write;
 use sha2::Digest as _;
+
+/// Implementation of the simple storage backend.
+pub struct SimpleStorage(SimpleCAS, SimpleLabels);
+
+/// Create a simple storage backend.
+pub fn storage(path: impl AsRef<Path>) -> io::Result<SimpleStorage> {
+    let buf: PathBuf = path.as_ref().into();
+    let cas = SimpleCAS::new(&buf.join("cas"))?;
+    let labels = SimpleLabels::new(&buf.join("labels"))?;
+    Ok(SimpleStorage(cas, labels))
+}
+
+impl Storage for SimpleStorage {
+    type C = SimpleCAS;
+    type L = SimpleLabels;
+    fn cas(&self) -> &Self::C{ &self.0 }
+    fn labels(&self) -> &Self::L{ &self.1 }
+}
 
 /// Content-addressed storage in the Simple DB format.
 pub struct SimpleCAS(PathBuf);
@@ -67,20 +99,18 @@ impl CAS for SimpleCAS {
     }
 }
 
-pub fn storage(path: impl AsRef<Path>) -> io::Result<Simple> {
-    Simple::new(path)
-}
-
-pub struct Labels(PathBuf);
-impl Labels {
+/// Mutable label management.
+pub struct SimpleLabels(PathBuf);
+impl SimpleLabels {
     fn new(path: impl AsRef<Path>) -> io::Result<Self> {
         let path: PathBuf = path.as_ref().into();
         std::fs::create_dir_all(&path)?;
         Ok(Self(path))
     }
-
-    pub fn read(&self, name: impl AsRef<str>) -> io::Result<Vec<u8>> {
-        match std::fs::read(&self.0.join(name.as_ref())) {
+}
+impl Labels for SimpleLabels {
+    fn read(&self, name: &Label) -> io::Result<Vec<u8>> {
+        match std::fs::read(&self.0.join(name.as_path())) {
             Ok(bytes) => Ok(bytes),
             Err(e) => match e.kind() {
                 NotFound => Ok(vec![]),
@@ -89,8 +119,8 @@ impl Labels {
         }
     }
 
-    pub fn write(&self, name: impl AsRef<str>, value: impl AsRef<[u8]>) -> io::Result<()> {
-        let dest = &self.0.join(name.as_ref());
+    fn write(&self, name: &Label, value: impl AsRef<[u8]>) -> io::Result<()> {
+        let dest = &self.0.join(name.as_path());
         let mut file = NamedTempFile::new_in(&self.0)?;
         file.write_all(value.as_ref())?;
         match file.persist(dest) {
@@ -100,18 +130,6 @@ impl Labels {
     }
 }
 
-pub struct Simple(SimpleCAS, Labels);
-impl Simple {
-    pub fn new(path: impl AsRef<Path>) -> io::Result<Self> {
-        let buf: PathBuf = path.as_ref().into();
-        let cas = SimpleCAS::new(&buf.join("cas"))?;
-        let labels = Labels::new(&buf.join("labels"))?;
-        Ok(Self(cas, labels))
-    }
-    pub fn cas(&self) -> &SimpleCAS { &self.0 }
-    pub fn labels(&self) -> &Labels { &self.1 }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -119,41 +137,9 @@ mod test {
     use std::io::Read;
 
     #[test]
-    fn lab_read() -> io::Result<()> {
-        let dir = TempDir::new("dirtabase")?;
-        let store = Simple::new(&dir)?;
-        let path = dir.path().join("labels/@foo");
-
-        // No label file but not an error, represented as empty array
-        assert_eq!(store.labels().read("@foo")?, vec![0;0]);
-
-        // Artificially inject some contents
-        std::fs::write(path, b"Some bytes")?;
-        assert_eq!(store.labels().read("@foo")?, b"Some bytes");
-
-        Ok(())
-    }
-
-    #[test]
-    fn lab_write() -> io::Result<()> {
-        let dir = TempDir::new("dirtabase")?;
-        let store = Simple::new(&dir)?;
-        let path = dir.path().join("labels/@foo");
-
-        // Prior to write, file doesn't exist
-        assert!(!path.exists());
-
-        // After writing, contains the expected contents
-        store.labels().write("@foo", b"Some contents")?;
-        assert_eq!(std::fs::read(path)?, b"Some contents");
-
-        Ok(())
-    }
-
-    #[test]
     fn cas_read() -> io::Result<()> {
         let dir = TempDir::new("dirtabase")?;
-        let store = Simple::new(&dir)?;
+        let store = storage(&dir)?;
         let d: Digest = "some text".into();
         let path = dir.path().join("cas").join(d.to_hex());
 
@@ -172,7 +158,7 @@ mod test {
     #[test]
     fn cas_write() -> io::Result<()> {
         let dir = TempDir::new("dirtabase")?;
-        let store = Simple::new(&dir)?;
+        let store = storage(&dir)?;
         let contents = "some text";
         let d: Digest = contents.into();
         let path = dir.path().join("cas").join(d.to_hex());
@@ -189,4 +175,39 @@ mod test {
 
         Ok(())
     }
+
+    #[test]
+    fn lab_read() -> io::Result<()> {
+        let dir = TempDir::new("dirtabase")?;
+        let store = storage(&dir)?;
+        let lab = Label::new("@foo").unwrap();
+        let path = dir.path().join("labels/@foo");
+
+        // No label file but not an error, represented as empty array
+        assert_eq!(store.labels().read(&lab)?, vec![0;0]);
+
+        // Artificially inject some contents
+        std::fs::write(path, b"Some bytes")?;
+        assert_eq!(store.labels().read(&lab)?, b"Some bytes");
+
+        Ok(())
+    }
+
+    #[test]
+    fn lab_write() -> io::Result<()> {
+        let dir = TempDir::new("dirtabase")?;
+        let store = storage(&dir)?;
+        let lab = Label::new("@foo").unwrap();
+        let path = dir.path().join("labels/@foo");
+
+        // Prior to write, file doesn't exist
+        assert!(!path.exists());
+
+        // After writing, contains the expected contents
+        store.labels().write(&lab, b"Some contents")?;
+        assert_eq!(std::fs::read(path)?, b"Some contents");
+
+        Ok(())
+    }
+
 }
