@@ -10,84 +10,175 @@
 //! ```
 
 // Don't pollute namespace, just make sure we're loading some traits
-use sha2::Digest as _;
 use hex::ToHex;
+use sha2::Digest as _;
+use serde::de::Visitor;
+use serde::de;
 
-/// Anything that implements Cruncher can be used by DigestAny.
-pub trait Cruncher {
-    type Output: AsRef<[u8]>;
-    fn crunch(data: impl AsRef<[u8]>) -> Self::Output;
-}
+/// Trait for upstream vendor tools which produce digests.
+pub trait Hasher<const N: usize>: sha2::Digest + Sized {
+    /// Produce an N-byte digest as a raw byte array.
+    fn into_bytes(self) -> [u8; N];
 
-impl Cruncher for sha2::Sha256 {
-    type Output = [u8; 256/8];
-    fn crunch(data: impl AsRef<[u8]>) -> Self::Output {
-        Self::digest(data).as_slice().try_into().unwrap()
+    /// Produce a Dirtabase digest type.
+    fn into_digest(self) -> D<N> {
+        D::<N>(self.into_bytes())
     }
 }
-impl Cruncher for sha2::Sha512 {
-    type Output = [u8; 512/8];
-    fn crunch(data: impl AsRef<[u8]>) -> Self::Output {
-        Self::digest(data).as_slice().try_into().unwrap()
+
+// Need one of these per algorithm
+impl Hasher<{ 256 / 8 }> for sha2::Sha256 {
+    fn into_bytes(self) -> [u8; 256 / 8] {
+        self.finalize().as_slice().try_into().unwrap()
+    }
+}
+impl Hasher<{ 512 / 8 }> for sha2::Sha512 {
+    fn into_bytes(self) -> [u8; 512 / 8] {
+        self.finalize().as_slice().try_into().unwrap()
     }
 }
 
 /// Generic digest implementation.
 ///
-/// This is used to make the "real" types
-/// you'd use every day, particularly Digest. This flexibility should be
-/// somewhat helpful if Sha256 ever proves inadequate, which isn't likely
-/// in the _near_ future, but is plausible on a long enough timescale.
-pub struct DigestAny<C> where C: Cruncher {
-    bytes: C::Output,
-}
-impl<C> DigestAny<C> where C: Cruncher {
-    /// Human-friendly representation of digest bytes.
-    pub fn to_hex(&self) -> String {
-        self.encode_hex()
-    }
-
+/// This is used to make the "real" types you'd use every day, particularly
+/// Digest. This flexibility should be somewhat helpful if Sha256 ever proves
+/// inadequate, which isn't likely in the _near_ future, but is plausible on a
+/// long enough timescale.
+#[derive(PartialEq, Copy, Clone)]
+pub struct D<const N: usize>([u8; N]);
+impl<const N: usize> D<N> {
     /// Machine-friendly borrow of digest bytes.
-    pub fn to_bytes(&self) -> &C::Output {
-        &self.bytes
+    pub fn to_bytes(&self) -> &[u8; N] {
+        &self.0
     }
 
     /// Import from some external source. Be careful to preserve invariants!
-    pub fn from_bytes(bytes: C::Output) -> Self {
-        Self { bytes: bytes }
+    pub fn from_bytes(bytes: &[u8; N]) -> Self {
+        Self(bytes.clone())
+    }
+
+    /// Human-friendly representation of digest bytes.
+    pub fn to_hex(&self) -> String {
+        self.to_bytes().encode_hex()
     }
 }
-impl<T,C> From<T> for DigestAny<C> where C: Cruncher, T: AsRef<[u8]> {
-    fn from(data: T) -> Self {
-        Self { bytes: C::crunch(data) }
-    }
-}
-impl<C> ToHex for DigestAny<C> where C: Cruncher, C::Output: ToHex {
-    fn encode_hex<T: FromIterator<char>>(&self) -> T {
-        self.bytes.encode_hex()
-    }
-    fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
-        self.bytes.encode_hex_upper()
-    }
-}
-impl<C> std::fmt::Debug for DigestAny<C> where C: Cruncher {
+
+impl<const N: usize> std::fmt::Debug for D<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Digest({:?})", self.to_hex())
     }
 }
+impl<const N: usize> serde::Serialize for D<N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+impl<'de, const N: usize> serde::Deserialize<'de> for D<N> {
+    fn deserialize<DE>(deserializer: DE) -> Result<Self, DE::Error>
+    where
+        DE: serde::Deserializer<'de>,
+    {
+        struct HexVisitor<const N: usize>;
+        impl<'de, const N: usize> Visitor<'de> for HexVisitor<N> {
+            type Value = D::<N>;
 
-pub type DigestSha256 = DigestAny<sha2::Sha256>;
-pub type DigestSha512 = DigestAny<sha2::Sha512>;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a hex string representing {} bytes", N)
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<D<N>, E>
+            where
+                E: de::Error,
+            {
+                let vec = hex::decode(value).expect("Bytes must be valid hex");
+                let bytes: [u8; N] = match vec.try_into() {
+                    Ok(b) => b,
+                    Err(o) => panic!("Expected a digest of {} bytes, got {}", N, o.len()),
+                };
+                Ok(D::from_bytes(&bytes))
+            }
+        }
+
+        deserializer.deserialize_str(HexVisitor::<N>)
+    }
+}
+
+// We divide by 8 since these are named after the number of bits, not bytes.
+pub type DigestSha256 = D<{ 256 / 8 }>;
+pub type DigestSha512 = D<{ 512 / 8 }>;
 
 /// The default Digest type used throughout Dirtabase.
 pub type Digest = DigestSha256;
+
+impl<T> From<T> for DigestSha256
+where
+    T: AsRef<[u8]>,
+{
+    fn from(data: T) -> Self {
+        sha2::Sha256::new().chain_update(data).into_digest()
+    }
+}
+impl<T> From<T> for DigestSha512
+where
+    T: AsRef<[u8]>,
+{
+    fn from(data: T) -> Self {
+        sha2::Sha512::new().chain_update(data).into_digest()
+    }
+}
 
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn default() {
+    fn simple_demo() {
+        let hasher = sha2::Sha256::new();
+        let d = hasher.chain_update("Hello world!").into_digest();
+        assert_eq!(
+            d.to_hex(),
+            "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a"
+        );
+    }
+
+    #[test]
+    fn partial_eq() {
+        let d1: Digest = "Hello from D1!".into();
+        let d2: Digest = "Hello from D2!".into();
+        assert_eq!(d1, d1);
+        assert!(d1 != d2);
+    }
+
+    #[test]
+    fn into() {
+        let d: Digest = "Hello world!".into();
+        assert_eq!(
+            d.to_hex(),
+            "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a"
+        );
+    }
+
+    #[test]
+    fn serialize() {
+        let d: Digest = "Hello world!".into();
+        let s = serde_json::to_string(&d).expect("failed to serialize");
+        assert_eq!(
+            s,
+            "\"c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a\""
+        );
+    }
+    #[test]
+    fn deserialize() {
+        let s = "\"c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a\"";
+        let d: Digest = serde_json::from_str(&s).expect("failed to deserialize");
+        assert_eq!(d, Digest::from("Hello world!"))
+    }
+
+    #[test]
+    fn from_sha256() {
         let d = Digest::from("Hello world!");
         assert_eq!(
             &d.to_hex(),
@@ -97,7 +188,7 @@ mod test {
     }
 
     #[test]
-    fn sha512() {
+    fn from_sha512() {
         let d = DigestSha512::from("Hello world!");
         assert_eq!(
             &d.to_hex(),
