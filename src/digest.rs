@@ -11,9 +11,9 @@
 
 // Don't pollute namespace, just make sure we're loading some traits
 use hex::ToHex;
-use sha2::Digest as _;
-use serde::de::Visitor;
 use serde::de;
+use serde::de::Visitor;
+use sha2::Digest as _;
 
 /// Trait for upstream vendor tools which produce digests.
 pub trait Hasher<const N: usize>: sha2::Digest + Sized {
@@ -83,7 +83,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for D<N> {
     {
         struct HexVisitor<const N: usize>;
         impl<'de, const N: usize> Visitor<'de> for HexVisitor<N> {
-            type Value = D::<N>;
+            type Value = D<N>;
 
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "a hex string representing {} bytes", N)
@@ -93,11 +93,10 @@ impl<'de, const N: usize> serde::Deserialize<'de> for D<N> {
             where
                 E: de::Error,
             {
-                let vec = hex::decode(value).expect("Bytes must be valid hex");
-                let bytes: [u8; N] = match vec.try_into() {
-                    Ok(b) => b,
-                    Err(o) => panic!("Expected a digest of {} bytes, got {}", N, o.len()),
-                };
+                let vec = hex::decode(value).map_err(de::Error::custom)?;
+                let bytes: [u8; N] = vec
+                    .try_into()
+                    .map_err(|o: Vec<u8>| de::Error::invalid_length(o.len(), &self))?;
                 Ok(D::from_bytes(&bytes))
             }
         }
@@ -174,7 +173,19 @@ mod test {
     fn deserialize() {
         let s = "\"c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a\"";
         let d: Digest = serde_json::from_str(&s).expect("failed to deserialize");
-        assert_eq!(d, Digest::from("Hello world!"))
+        assert_eq!(d, Digest::from("Hello world!"));
+
+        // Error scenario 1: not a JSON string
+        let d = serde_json::from_str::<Digest>("123");
+        assert!(d.is_err());
+
+        // Error scenario 2: it's not hex
+        let d = serde_json::from_str::<Digest>("\"text but not hex\"");
+        assert!(d.is_err());
+
+        // Error scenario 3: Wrong length
+        let d = serde_json::from_str::<Digest>("\"123\"");
+        assert!(d.is_err());
     }
 
     #[test]
