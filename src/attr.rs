@@ -21,7 +21,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A single attribute on a file or directory.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Attr(String, String);
 impl Attr {
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
@@ -37,7 +37,7 @@ impl Attr {
 }
 
 /// All attributes on a file or directory.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Attrs(Vec<Attr>);
 impl Attrs {
     pub fn new() -> Self { Self(vec![]) }

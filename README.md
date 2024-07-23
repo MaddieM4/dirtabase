@@ -49,7 +49,7 @@ Breaking down the parts:
  * `scheme`: Identifies which engine type to use
  * `fullpath`: Engine-specific configuration, including params
  * `ref`: May be a digest or a label
-   * `digest` - "$format-$compression-$hexdigest"
+   * `triad` - "$format-$compression-$hexdigest"
    * `label` - a human-readable mutable label starting in `@`
  * `path`: navigates from `ref` to a file or directory within it
 
