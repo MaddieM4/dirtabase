@@ -1,7 +1,9 @@
 pub use crate::digest::Digest;
 pub use crate::attr::Attrs;
-use serde::{Deserialize,Serialize};
-use std::path::PathBuf;
+pub use crate::storage::traits::Storage;
+
+pub use serde::{Deserialize,Serialize};
+pub use std::path::{Path,PathBuf};
 
 #[derive(PartialEq,Debug,Clone,Copy,Serialize,Deserialize)]
 #[serde(rename_all="lowercase")]

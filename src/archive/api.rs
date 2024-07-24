@@ -4,7 +4,7 @@ use std::io::{Cursor,Result};
 
 // How on earth do we want to interact with a Storage?
 
-fn archive_encode(ar: &Archive, f: Format, c: Compression) -> Result<Vec<u8>> {
+pub fn archive_encode(ar: &Archive, f: Format, c: Compression) -> Result<Vec<u8>> {
     // Current support limitations
     assert!(f == Format::JSON);
     assert!(c == Compression::Plain);
@@ -12,7 +12,7 @@ fn archive_encode(ar: &Archive, f: Format, c: Compression) -> Result<Vec<u8>> {
     serde_json::to_vec(ar).map_err(|e| std::io::Error::other(e))
 }
 
-fn archive_decode(bytes: Vec<u8>, f: Format, c: Compression) -> Result<Archive> {
+pub fn archive_decode(bytes: Vec<u8>, f: Format, c: Compression) -> Result<Archive> {
     // Current support limitations
     assert!(f == Format::JSON);
     assert!(c == Compression::Plain);
