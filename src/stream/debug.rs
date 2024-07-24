@@ -24,7 +24,7 @@ use std::io::Cursor;
 /// Send a standard series of directories and files.
 ///
 /// Used for various tests (for example, this module's docs!)
-pub fn source(s: impl Sink) -> Result<()> {
+pub fn source<S>(s: S) -> Result<S::Receipt> where S: Sink {
     s.send_dir("/a/directory", Attrs::new().set("Foo", "Bar"))?
         .send_file(
             "/some/dir/hello.txt",
@@ -92,6 +92,8 @@ impl DebugSink<'_> {
 }
 
 impl Sink for DebugSink<'_> {
+    type Receipt = ();
+
     fn send_dir(self, path: impl AsRef<Path>, attrs: Attrs) -> Result<Self> {
         Ok(self.write_head("DIR", path).write_attrs(attrs))
     }

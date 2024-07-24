@@ -33,7 +33,7 @@ use tempdir::TempDir;
 ///
 /// # Ok::<(), std::io::Error>(())
 /// ```
-pub fn source(base: impl AsRef<Path>, sink: impl Sink) -> Result<()> {
+pub fn source<S>(base: impl AsRef<Path>, sink: S) -> Result<S::Receipt> where S: Sink {
     visit(base.as_ref(), Path::new("/"), sink)?.finalize()
 }
 
@@ -92,6 +92,8 @@ impl OsdirSink {
     }
 }
 impl Sink for OsdirSink {
+    type Receipt = ();
+
     fn send_dir(self, path: impl AsRef<Path>, _attrs: Attrs) -> Result<Self> {
         // TODO: use attrs
         let path = self.normalize(path.as_ref());

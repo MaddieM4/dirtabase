@@ -16,7 +16,9 @@ use std::path::Path;
 /// the `finalize()` function makes the effects real. See `dirtabase::stream::osdir` for
 /// a very practical and concrete example.
 pub trait Sink where Self: Sized {
+    type Receipt;
+
     fn send_dir(self, path: impl AsRef<Path>, attrs: Attrs) -> Result<Self>;
     fn send_file(self, path: impl AsRef<Path>, attrs: Attrs, r: impl Read) -> Result<Self>;
-    fn finalize(self) -> Result<()>;
+    fn finalize(self) -> Result<Self::Receipt>;
 }

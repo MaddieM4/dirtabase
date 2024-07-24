@@ -30,7 +30,7 @@
 //! let digest = store.cas().write_buf("foo")?;
 //!
 //! assert_eq!(digest.to_hex(), Digest::from("foo").to_hex());
-//! Ok::<(), std::io::Error>(())
+//! # Ok::<(), std::io::Error>(())
 //! ```
 
 use crate::storage::core::*;
