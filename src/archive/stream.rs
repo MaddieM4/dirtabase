@@ -1,5 +1,5 @@
-use crate::archive::core::*;
 use crate::archive::api::*;
+use crate::archive::core::*;
 use crate::storage::traits::*;
 use crate::stream::core::Sink;
 use std::io::{Cursor, Error, ErrorKind, Read, Result};
@@ -10,7 +10,7 @@ where
 {
     store: &'a S,
     archive: Archive,
-    format: Format,
+    format: ArchiveFormat,
     compression: Compression,
 }
 impl<'a, S> ArchiveSink<'a, S>
@@ -21,7 +21,7 @@ where
         Self {
             store: store,
             archive: vec![],
-            format: Format::JSON,
+            format: ArchiveFormat::JSON,
             compression: Compression::Plain,
         }
     }
@@ -33,35 +33,28 @@ where
     type Receipt = Triad;
 
     fn send_dir(mut self, path: impl AsRef<Path>, attrs: Attrs) -> Result<Self> {
-        // This is an awful dumb hack that I'm just using to get to
-        // a clean refactor milestone. It's about to not work this way.
-        //
-        // What's going on here? Storing an empty archive serialized as JSON.
-        // Which we can then reference as a sub-archive to work around the
-        // temporary limitation of archives ONLY being able to represent a dir
-        // as a sub-archive. The cleaner future solution is going to work by
-        // making the archive format match streams exactly, then extend with
-        // support for sub-archives.
-
-        let digest = self.store.cas().write(Cursor::new("[]"))?;
-        let triad = Triad(Format::JSON, Compression::Plain, digest);
-        let entry = Entry(path.as_ref().into(), triad, attrs);
-        self.archive.push(entry);
+        self.archive.push(Entry::Dir {
+            path: path.as_ref().into(),
+            attrs: attrs,
+        });
         Ok(self)
     }
 
     fn send_file(mut self, path: impl AsRef<Path>, attrs: Attrs, r: impl Read) -> Result<Self> {
         let digest = self.store.cas().write(r)?;
-        let triad = Triad(Format::File, Compression::Plain, digest);
-        let entry = Entry(path.as_ref().into(), triad, attrs);
-        self.archive.push(entry);
+        self.archive.push(Entry::File {
+            path: path.as_ref().into(),
+            attrs: attrs,
+            compression: Compression::Plain,
+            digest: digest,
+        });
         Ok(self)
     }
 
     fn finalize(self) -> Result<Triad> {
         let bytes = archive_encode(&self.archive, self.format, self.compression)?;
         let digest = self.store.cas().write(Cursor::new(bytes))?;
-        Ok(Triad(self.format, self.compression, digest))
+        Ok(Triad(TriadFormat::Archive(self.format), self.compression, digest))
     }
 }
 
@@ -69,7 +62,18 @@ pub fn archive_source<S>(store: &impl Storage, triad: Triad, mut sink: S) -> Res
 where
     S: Sink,
 {
-    let opt_reader = store.cas().read(triad.digest())?;
+    let (f, c, d) = (triad.0, triad.1, triad.2);
+    let f = match f {
+        TriadFormat::File => {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                "Cannot read a file as an archive",
+            ))
+        }
+        TriadFormat::Archive(f) => f,
+    };
+
+    let opt_reader = store.cas().read(&d)?;
     let mut r = opt_reader.ok_or(Error::new(
         ErrorKind::NotFound,
         "Source digest doesn't exist in store",
@@ -78,19 +82,18 @@ where
     let mut bytes: Vec<u8> = vec![];
     r.read_to_end(&mut bytes)?;
 
-    let archive = archive_decode(bytes, triad.format(), triad.compression())?;
+    let archive = archive_decode(bytes, f, c)?;
     for entry in archive {
-        let triad: Triad = entry.1;
-        if triad.format() == Format::File {
-            let opt_reader = store.cas().read(entry.1.digest())?;
-            let r = opt_reader.ok_or(Error::new(
-                ErrorKind::NotFound,
-                "Source digest doesn't exist in store",
-            ))?;
-            sink = sink.send_file(entry.0, entry.2, r)?;
-        } else {
-            // TODO: recursion
-            sink = sink.send_dir(entry.0, entry.2)?;
+        sink = match entry {
+            Entry::Dir{path, attrs} => sink.send_dir(path, attrs)?,
+            Entry::File{path, attrs, compression: _, digest} => {
+                let opt_reader = store.cas().read(&digest)?;
+                let r = opt_reader.ok_or(Error::new(
+                    ErrorKind::NotFound,
+                    "Source digest doesn't exist in store",
+                ))?;
+                sink.send_file(path, attrs, r)?
+            }
         }
     }
 
