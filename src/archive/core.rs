@@ -20,6 +20,11 @@ pub enum Compression {
 
 #[derive(PartialEq,Debug,Clone,Copy,Serialize,Deserialize)]
 pub struct Triad(pub Format,pub Compression,pub Digest);
+impl Triad {
+    pub fn format(&self) -> Format { self.0 }
+    pub fn compression(&self) -> Compression { self.1 }
+    pub fn digest(&self) -> &Digest { &self.2 }
+}
 
 #[derive(PartialEq,Debug,Clone,Serialize,Deserialize)]
 pub struct Entry(pub PathBuf,pub Triad,pub Attrs);

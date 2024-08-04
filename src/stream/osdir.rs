@@ -20,8 +20,7 @@ use tempdir::TempDir;
 /// use dirtabase::stream::debug::sink; // Debug sink
 /// use indoc::indoc;
 ///
-/// let mut s = String::new();
-/// source("./fixture", sink(&mut s))?;
+/// let s = source("./fixture", sink())?;
 /// assert_eq!(&s, indoc! {"
 ///   FILE /file_at_root.txt
 ///     Length: 37

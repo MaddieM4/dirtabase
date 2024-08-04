@@ -4,9 +4,8 @@
 //! use dirtabase::stream::debug::{source,sink};
 //! use indoc::indoc;
 //!
-//! let mut s = String::new();
-//! source(sink(&mut s)).expect("Really can't fail");
-//! assert_eq!(&s, indoc! {"
+//! let txt = source(sink()).expect("Really can't fail");
+//! assert_eq!(&txt, indoc! {"
 //!   DIR /a/directory
 //!     Foo: Bar
 //!   FILE /some/dir/hello.txt
@@ -43,8 +42,7 @@ pub fn source<S>(s: S) -> Result<S::Receipt> where S: Sink {
 /// use std::io::Cursor;
 /// use indoc::indoc;
 ///
-/// let mut s = String::new();
-/// sink(&mut s)
+/// let txt = sink()
 ///     .send_dir("/a/directory", Attrs::new().set("Foo","Bar"))?
 ///     .send_file(
 ///         "/some/dir/hello.txt",
@@ -52,7 +50,7 @@ pub fn source<S>(s: S) -> Result<S::Receipt> where S: Sink {
 ///         Cursor::new("The file contents"))?
 ///     .finalize()?;
 ///
-/// assert_eq!(&s, indoc! {"
+/// assert_eq!(&txt, indoc! {"
 ///   DIR /a/directory
 ///     Foo: Bar
 ///   FILE /some/dir/hello.txt
@@ -61,15 +59,15 @@ pub fn source<S>(s: S) -> Result<S::Receipt> where S: Sink {
 /// "});
 /// # Ok::<(), std::io::Error>(())
 /// ```
-pub fn sink(s: &mut String) -> DebugSink {
-    DebugSink(s)
+pub fn sink() -> DebugSink {
+    DebugSink(String::new())
 }
 
 /// Implementation of sink().
-pub struct DebugSink<'a>(&'a mut String);
+pub struct DebugSink(String);
 
-impl DebugSink<'_> {
-    fn write_line(self, line: &str) -> Self {
+impl DebugSink {
+    fn write_line(mut self, line: &str) -> Self {
         self.0.push_str(line);
         self
     }
@@ -82,7 +80,7 @@ impl DebugSink<'_> {
         ))
     }
 
-    fn write_attrs(self, attrs: Attrs) -> Self {
+    fn write_attrs(mut self, attrs: Attrs) -> Self {
         for attr in attrs.items() {
             let text = format!("  {}: {}\n", attr.name(), attr.value());
             self.0.push_str(&text);
@@ -91,8 +89,8 @@ impl DebugSink<'_> {
     }
 }
 
-impl Sink for DebugSink<'_> {
-    type Receipt = ();
+impl Sink for DebugSink {
+    type Receipt = String;
 
     fn send_dir(self, path: impl AsRef<Path>, attrs: Attrs) -> Result<Self> {
         Ok(self.write_head("DIR", path).write_attrs(attrs))
@@ -104,8 +102,8 @@ impl Sink for DebugSink<'_> {
             .write_line(&format!("  Length: {}\n", size))
             .write_attrs(attrs))
     }
-    fn finalize(self) -> Result<()> {
-        Ok(())
+    fn finalize(self) -> Result<String> {
+        Ok(self.0)
     }
 }
 
@@ -117,8 +115,7 @@ mod test {
 
     #[test]
     fn builder_api() -> Result<()> {
-        let mut s = String::new();
-        DebugSink(&mut s)
+        let txt = sink()
             .send_dir("/a/deep/directory", Attrs::new())?
             .send_file("/some/file.txt", Attrs::new(), Cursor::new("contents"))?
             .send_dir(
@@ -138,7 +135,7 @@ mod test {
             .finalize()?;
 
         assert_eq!(
-            &s,
+            &txt,
             indoc! {"
             DIR /a/deep/directory
             FILE /some/file.txt
