@@ -1,6 +1,7 @@
-use crate::archive::core::Triad;
-use crate::storage::traits::Storage;
+use crate::archive::core::{Triad,TriadFormat};
+use crate::storage::traits::*;
 use std::io::{Error, Result};
+use regex::Regex;
 
 // TODO: Multi-backend interaction
 
@@ -8,6 +9,7 @@ use std::io::{Error, Result};
 pub enum Op {
     Import,
     Export,
+    Filter,
 }
 
 pub fn perform(
@@ -19,6 +21,7 @@ pub fn perform(
     match op {
         Op::Import => import(store, triads, params),
         Op::Export => export(store, triads, params),
+        Op::Filter => filter(store, triads, params),
     }
 }
 
@@ -55,10 +58,30 @@ fn export(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Resu
     Ok(output)
 }
 
+fn filter(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
+    if params.len() != 1 {
+        return Err(Error::other("--filter takes exactly 1 param"));
+    }
+    let criteria = Regex::new(&params[0]).map_err(|e| Error::other(e))?;
+    let mut output: Vec<Triad> = vec![];
+    for t in triads {
+        let (f, c, d) = (t.0, t.1, t.2);
+        let f = match f {
+            TriadFormat::File => return Err(Error::other("All input triads must be archives")),
+            TriadFormat::Archive(f) => f,
+        };
+        let ar = crate::archive::api::read_archive(f, c, &d, store)?;
+        let ar = crate::archive::api::filter(ar, &criteria);
+        let digest = crate::archive::api::write_archive(&ar, f, c, store)?;
+        output.push(Triad(TriadFormat::Archive(f), c, digest));
+    }
+    Ok(output)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::archive::core::{Attrs, Compression, TriadFormat};
+    use crate::archive::core::{Attrs, Compression};
     use crate::digest::Digest;
     use crate::storage::simple::storage;
     use crate::stream::core::Sink;
@@ -84,6 +107,7 @@ mod test {
         .finalize()
     }
 
+    // TODO: move to utils
     fn path_str(p: impl AsRef<std::path::Path>) -> String {
         p.as_ref()
             .to_str()
@@ -123,6 +147,22 @@ mod test {
             vec![]
         );
         assert!(output_dir.path().join("dir1/dir2/nested.txt").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn filter() -> Result<()> {
+        let out = tempdir()?;
+        let store_dir = tempdir()?;
+        let store = storage(store_dir.path())?;
+        let imported = perform(Op::Import, &store, vec![], vec!["./fixture".into()])?;
+        let filtered = perform(Op::Filter, &store, imported, vec!["dir2".into()])?;
+        let exported = perform(Op::Export, &store, filtered, vec![path_str(&out)])?;
+
+        assert_eq!(exported, vec![]);
+        assert!(out.path().join("dir1/dir2").exists());
+        assert!(out.path().join("dir1/dir2/nested.txt").exists());
+        assert!(! out.path().join("file_at_root.txt").exists());
         Ok(())
     }
 }

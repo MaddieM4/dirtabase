@@ -11,8 +11,8 @@ dirtabase \
   --import some/directory some/other/directory \
   --merge \
   --prefix some '' \
-  --cmd 'find -type f | xargs md5sum > sums' \
-  --filter sums \
+  --cmd-impure 'find -type f | xargs md5sum > sums' \
+  --filter '^/sums' \
   --export .
 
 # --------------
@@ -27,9 +27,9 @@ dirtabase --import some/directory some/other/directory \
  \ # Strip 'some' off the start of filenames within dirs
  | dirtabase --prefix some ''
  \ # Run a command on each top level directory that passes through
- | dirtabase --cmd 'find -type f | xargs md5sum > sums.txt'
+ | dirtabase --cmd-impure 'find -type f | xargs md5sum > sums.txt'
  \ # Filter top level directories so each only has matching files
- | dirtabase --filter sums
+ | dirtabase --filter '^/sums'
  \ # Put files into the current OS directory (should just be ./sums.txt in this case)
  | dirtabase --export .
 ```
@@ -38,10 +38,19 @@ At each step, the interface is a stream of digests or other references
 passing from one stage of processing to the next. That's the input and
 output stream format of `dirtabase` Operators.
 
+#### Currently implemented from example:
+
+ * [X] import
+ * [ ] merge
+ * [ ] prefix
+ * [ ] cmd-impure
+ * [X] filter
+ * [X] export
+
 ## URL format
 
 ```
-scheme://engine-specific.url/stuff?including=engine_params#@label:path
+scheme://engine-specific.url/stuff?including=engine_params#@ref:path
 ```
 
 Breaking down the parts:

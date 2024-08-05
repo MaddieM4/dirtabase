@@ -1,6 +1,7 @@
 use crate::archive::core::*;
-use crate::storage::traits::CAS;
-use std::io::{Cursor,Result};
+use crate::storage::traits::{Storage,CAS};
+use std::io::{Cursor,Result,Read as _};
+use regex::Regex;
 
 // How on earth do we want to interact with a Storage?
 
@@ -12,7 +13,7 @@ pub fn archive_decode(bytes: Vec<u8>, _f: ArchiveFormat, _c: Compression) -> Res
     serde_json::from_slice(bytes.as_ref()).map_err(|e| std::io::Error::other(e))
 }
 
-pub fn write_archive(ar: &Archive, f: ArchiveFormat, c: Compression, cas: impl CAS) -> Result<Digest> {
+pub fn write_archive(ar: &Archive, f: ArchiveFormat, c: Compression, store: &impl Storage) -> Result<Digest> {
     // Turn `ar` into `bytes: Vec<u8>`
     let bytes = archive_encode(ar, f, c)?;
 
@@ -20,7 +21,31 @@ pub fn write_archive(ar: &Archive, f: ArchiveFormat, c: Compression, cas: impl C
     let curs = Cursor::new(bytes);
 
     // Use that in cas.write()
-    cas.write(curs)
+    store.cas().write(curs)
+}
+
+pub fn read_archive(f: ArchiveFormat, c: Compression, digest: &Digest, store: &impl Storage) -> Result<Archive> {
+    let mut bytes: Vec<u8> = vec![];
+    store.cas().read(digest)?.ok_or::<std::io::Error>(std::io::ErrorKind::NotFound.into())?.read_to_end(&mut bytes)?;
+    archive_decode(bytes, f, c)
+}
+
+// TODO: move to utils
+fn path_str(p: impl AsRef<std::path::Path>) -> String {
+    p.as_ref()
+        .to_str()
+        .expect("Could not convert path to string")
+        .into()
+}
+
+pub fn filter(ar: Archive, criteria: &Regex) -> Archive {
+    ar.into_iter().filter(|entry| {
+        let s: String = path_str(match entry {
+            Entry::Dir{path, ..} => path,
+            Entry::File{path, ..} => path,
+        });
+        criteria.is_match(&s)
+    }).collect()
 }
 
 #[cfg(test)]
@@ -44,5 +69,43 @@ mod test {
         
         let after = archive_decode(bytes, ArchiveFormat::JSON, Compression::Plain).expect("Should not fail to deserialize");
         assert_eq!(after, before);
+    }
+
+    #[test]
+    fn test_filter() {
+        let ar: Archive = vec![
+            Entry::Dir {
+                path: "/foo/bar".into(),
+                attrs: Attrs::new(),
+            },
+            Entry::File {
+                path: "/nomatch".into(),
+                attrs: Attrs::new(),
+                compression: Compression::Plain,
+                digest: "xyz".into(),
+            },
+            Entry::File {
+                path: "/match/me/foo.py".into(),
+                attrs: Attrs::new(),
+                compression: Compression::Plain,
+                digest: "xyz".into(),
+            },
+            Entry::Dir {
+                path: "/fail".into(),
+                attrs: Attrs::new(),
+            },
+        ];
+        assert_eq!(filter(ar, &Regex::new("foo").unwrap()), vec![
+            Entry::Dir {
+                path: "/foo/bar".into(),
+                attrs: Attrs::new(),
+            },
+            Entry::File {
+                path: "/match/me/foo.py".into(),
+                attrs: Attrs::new(),
+                compression: Compression::Plain,
+                digest: "xyz".into(),
+            },
+        ])
     }
 }

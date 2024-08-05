@@ -14,6 +14,11 @@ const USAGE: &'static str = indoc! {"
     # Export files from the DB to the operating system.
     # Consumes the last N items of the stack, where N is the number of params.
      --export .
+
+    # In each archive, filter files and directories by matching their
+    # path against a regular expression.
+     --filter '^/hello'
+     --filter 'x|y'
 "};
 
 #[derive(PartialEq,Debug)]
@@ -37,6 +42,7 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
             "--help" => return Behavior::Help,
             "--import" => pipeline.push(PipelineStep(Op::Import, vec![])),
             "--export" => pipeline.push(PipelineStep(Op::Export, vec![])),
+            "--filter" => pipeline.push(PipelineStep(Op::Filter, vec![])),
 
             other => if pipeline.is_empty() {
                 return Behavior::UnexpectedArg(other.to_owned())
@@ -113,6 +119,15 @@ mod test {
     fn parse_pipelines() {
         assert_eq!(parse(vec!["--import", "foo", "bar"].iter()), Behavior::Pipeline(vec![
             PipelineStep(Op::Import, vec!["foo".to_owned(), "bar".to_owned()]),
+        ]));
+        assert_eq!(parse(vec![
+            "--import", "foo", "bar",
+            "--filter", "some|regex",
+            "--export", "dir1", "dir2",
+        ].iter()), Behavior::Pipeline(vec![
+            PipelineStep(Op::Import, vec!["foo".to_owned(), "bar".to_owned()]),
+            PipelineStep(Op::Filter, vec!["some|regex".to_owned()]),
+            PipelineStep(Op::Export, vec!["dir1".to_owned(), "dir2".to_owned()]),
         ]));
     }
 
