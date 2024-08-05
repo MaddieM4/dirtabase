@@ -20,18 +20,33 @@ pub struct PipelineStep(Op, Vec<String>);
 pub enum Behavior {
     Help,
     Version,
+    UnexpectedArg(String),
     Pipeline(Vec<PipelineStep>),
 }
 
 pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
+    let mut pipeline: Vec<PipelineStep> = vec![];
+
     for arg in args {
         match arg.as_ref() {
             "--version" => return Behavior::Version,
             "--help" => return Behavior::Help,
-            _ => (),
+            "--import" => pipeline.push(PipelineStep(Op::Import, vec![])),
+            other => if pipeline.is_empty() {
+                return Behavior::UnexpectedArg(other.to_owned())
+            } else {
+                let index = pipeline.len() - 1;
+                let current_pipeline = &mut pipeline[index];
+                current_pipeline.1.push(other.to_owned())
+            },
         }
     }
-    Behavior::Help
+
+    if pipeline.is_empty() {
+        Behavior::Help
+    } else {
+        Behavior::Pipeline(pipeline)
+    }
 }
 
 
@@ -39,6 +54,7 @@ pub fn execute(behavior: Behavior, stdout: &mut impl Write) {
     match behavior {
         Behavior::Help => write!(stdout, "{}", USAGE),
         Behavior::Version => write!(stdout, "{}\n", env!("CARGO_PKG_VERSION")),
+        Behavior::UnexpectedArg(a) => write!(stdout, "Unexpected argument: {}\n", a),
         Behavior::Pipeline(steps) => execute_pipeline(steps, stdout),
     }.expect("Failed to execute");
 }
@@ -83,6 +99,18 @@ mod test {
     }
 
     #[test]
+    fn parse_unexpected_arg() {
+        assert_eq!(parse(vec!["xyz"].iter()), Behavior::UnexpectedArg("xyz".to_owned()));
+    }
+
+    #[test]
+    fn parse_pipelines() {
+        assert_eq!(parse(vec!["--import", "foo", "bar"].iter()), Behavior::Pipeline(vec![
+            PipelineStep(Op::Import, vec!["foo".to_owned(), "bar".to_owned()]),
+        ]));
+    }
+
+    #[test]
     fn execute_help() {
         let mut stdout: Vec<u8> = vec![];
         execute(Behavior::Help, &mut stdout);
@@ -95,6 +123,14 @@ mod test {
         execute(Behavior::Version, &mut stdout);
         assert_eq!(String::from_utf8(stdout).unwrap(), env!("CARGO_PKG_VERSION").to_owned() + "\n");
     }
+
+    #[test]
+    fn execute_unexpected_arg() {
+        let mut stdout: Vec<u8> = vec![];
+        execute(Behavior::UnexpectedArg("xyz".to_owned()), &mut stdout);
+        assert_eq!(String::from_utf8(stdout).unwrap(), "Unexpected argument: xyz\n");
+    }
+
 
     #[test]
     fn execute_pipeline_import() {
