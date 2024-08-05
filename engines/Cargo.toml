@@ -1,9 +1,0 @@
-[package]
-name = "engines"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-file-lock = "2.1.11"
-serde_json = "1.0.120"
-types = { path = "../types" }
