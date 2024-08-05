@@ -10,6 +10,10 @@ const USAGE: &'static str = indoc! {"
 
     # Import external files into database
      --import dir1 dir2 ... dirN
+
+    # Export files from the DB to the operating system.
+    # Consumes the last N items of the stack, where N is the number of params.
+     --export .
 "};
 
 #[derive(PartialEq,Debug)]
@@ -32,6 +36,8 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
             "--version" => return Behavior::Version,
             "--help" => return Behavior::Help,
             "--import" => pipeline.push(PipelineStep(Op::Import, vec![])),
+            "--export" => pipeline.push(PipelineStep(Op::Export, vec![])),
+
             other => if pipeline.is_empty() {
                 return Behavior::UnexpectedArg(other.to_owned())
             } else {
@@ -127,7 +133,7 @@ mod test {
     #[test]
     fn execute_unexpected_arg() {
         let mut stdout: Vec<u8> = vec![];
-        execute(Behavior::UnexpectedArg("xyz".to_owned()), &mut stdout);
+        execute(Behavior::UnexpectedArg("xyz".into()), &mut stdout);
         assert_eq!(String::from_utf8(stdout).unwrap(), "Unexpected argument: xyz\n");
     }
 
@@ -136,12 +142,28 @@ mod test {
     fn execute_pipeline_import() {
         let mut stdout: Vec<u8> = vec![];
         execute(Behavior::Pipeline(vec![
-            PipelineStep(Op::Import, vec!["./fixture".to_owned()]),
+            PipelineStep(Op::Import, vec!["./fixture".into()]),
         ]), &mut stdout);
         assert_eq!(String::from_utf8(stdout).unwrap(), indoc! {"
             --- Import ---
             json-plain-d6467585a5b63a42945759efd8c8a21dfd701470253339477407653e48a3643a
         "});
+    }
+
+    #[test]
+    fn execute_pipeline_export() {
+        let dir = tempfile::tempdir().expect("Failed to create temporary directory");
+        let mut stdout: Vec<u8> = vec![];
+        execute(Behavior::Pipeline(vec![
+            PipelineStep(Op::Import, vec!["./fixture".into()]),
+            PipelineStep(Op::Export, vec![dir.path().to_str().unwrap().into()]),
+        ]), &mut stdout);
+        assert_eq!(String::from_utf8(stdout).unwrap(), indoc! {"
+            --- Import ---
+            json-plain-d6467585a5b63a42945759efd8c8a21dfd701470253339477407653e48a3643a
+            --- Export ---
+        "});
+        assert!(dir.path().join("dir1/dir2/nested.txt").exists());
     }
 
 }
