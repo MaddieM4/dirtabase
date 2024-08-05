@@ -1,5 +1,7 @@
 use indoc::indoc;
 use std::io::Write;
+use crate::archive::core::Triad;
+use crate::op::{Op,perform as perform_op};
 
 const USAGE: &'static str = indoc! {"
     usage: dirtabase [--help|--version|pipeline...]
@@ -10,11 +12,15 @@ const USAGE: &'static str = indoc! {"
      --import dir1 dir2 ... dirN
 "};
 
+#[derive(PartialEq,Debug)]
+pub struct PipelineStep(Op, Vec<String>);
+
 /// What we decide to do based on CLI arguments
 #[derive(PartialEq,Debug)]
 pub enum Behavior {
     Help,
     Version,
+    Pipeline(Vec<PipelineStep>),
 }
 
 pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
@@ -33,7 +39,22 @@ pub fn execute(behavior: Behavior, stdout: &mut impl Write) {
     match behavior {
         Behavior::Help => write!(stdout, "{}", USAGE),
         Behavior::Version => write!(stdout, "{}\n", env!("CARGO_PKG_VERSION")),
+        Behavior::Pipeline(steps) => execute_pipeline(steps, stdout),
     }.expect("Failed to execute");
+}
+
+fn execute_pipeline(steps: Vec<PipelineStep>, stdout: &mut impl Write) -> std::io::Result<()> {
+    let store = crate::storage::simple::storage("./.dirtabase_db")?;
+    let mut triads: Vec<Triad> = vec![];
+    for step in steps {
+        let (op, params) = (step.0, step.1);
+        triads = perform_op(op, &store, triads, params)?;
+        write!(stdout, "--- {:?} ---\n", op)?;
+        for t in &triads {
+            write!(stdout, "{}\n", t)?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -73,6 +94,18 @@ mod test {
         let mut stdout: Vec<u8> = vec![];
         execute(Behavior::Version, &mut stdout);
         assert_eq!(String::from_utf8(stdout).unwrap(), env!("CARGO_PKG_VERSION").to_owned() + "\n");
+    }
+
+    #[test]
+    fn execute_pipeline_import() {
+        let mut stdout: Vec<u8> = vec![];
+        execute(Behavior::Pipeline(vec![
+            PipelineStep(Op::Import, vec!["./fixture".to_owned()]),
+        ]), &mut stdout);
+        assert_eq!(String::from_utf8(stdout).unwrap(), indoc! {"
+            --- Import ---
+            json-plain-d6467585a5b63a42945759efd8c8a21dfd701470253339477407653e48a3643a
+        "});
     }
 
 }

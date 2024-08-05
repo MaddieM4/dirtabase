@@ -54,7 +54,7 @@ where
     fn finalize(self) -> Result<Triad> {
         let bytes = archive_encode(&self.archive, self.format, self.compression)?;
         let digest = self.store.cas().write(Cursor::new(bytes))?;
-        dbg!(self.archive);
+        // dbg!(self.archive);
         Ok(Triad(TriadFormat::Archive(self.format), self.compression, digest))
     }
 }

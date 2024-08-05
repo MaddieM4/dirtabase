@@ -4,21 +4,25 @@ use std::io::Result;
 
 // TODO: Multi-backend interaction
 
-pub trait Operation {
-    fn perform(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>>;
+#[derive(Copy,Clone,PartialEq,Debug)]
+pub enum Op {
+    Import,
 }
 
-pub struct Import;
-impl Operation for Import {
-    fn perform(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
-        let mut output = triads;
-        for p in params {
-            let sink = crate::archive::stream::ArchiveSink::new(store);
-            let triad = crate::stream::osdir::source(p, sink)?;
-            output.push(triad)
-        }
-        Ok(output)
+pub fn perform(op: Op, store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
+    match op {
+        Op::Import => import(store, triads, params),
     }
+}
+
+fn import(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
+    let mut output = triads;
+    for p in params {
+        let sink = crate::archive::stream::ArchiveSink::new(store);
+        let triad = crate::stream::osdir::source(p, sink)?;
+        output.push(triad)
+    }
+    Ok(output)
 }
 
 #[cfg(test)]
@@ -44,15 +48,16 @@ mod test {
 
     #[test]
     fn import() -> Result<()> {
+        let op = Op::Import;
         let dir = tempdir()?;
         let store = storage(dir.path())?;
         let t1 = Triad(TriadFormat::File, Compression::Plain, Digest::from("foo"));
         let t2 = Triad(TriadFormat::File, Compression::Plain, Digest::from("bar"));
         let t3 = fixture_triad()?;
 
-        assert_eq!(Import::perform(&store, vec![], vec![])?, vec![]);
-        assert_eq!(Import::perform(&store, vec![t1, t2], vec![])?, vec![t1,t2]);
-        assert_eq!(Import::perform(&store, vec![t1, t2], vec!["./fixture".into()])?, vec![t1,t2, t3]);
+        assert_eq!(perform(op, &store, vec![], vec![])?, vec![]);
+        assert_eq!(perform(op, &store, vec![t1, t2], vec![])?, vec![t1,t2]);
+        assert_eq!(perform(op, &store, vec![t1, t2], vec!["./fixture".into()])?, vec![t1,t2, t3]);
         Ok(())
     }
 }
