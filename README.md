@@ -8,7 +8,7 @@ processes. It's going to be the backbone of the `layover` package manager.
 
 ```bash
 dirtabase \
-  --ingest some/directory some/other/directory \
+  --import some/directory some/other/directory \
   --merge \
   --prefix some '' \
   --cmd 'find -type f | xargs md5sum > sums' \
@@ -20,7 +20,7 @@ dirtabase \
 # --------------
 
 # Bring external files into DB, printing a digest for each
-dirtabase --ingest some/directory some/other/directory \
+dirtabase --import some/directory some/other/directory \
  \ # Consume multiple in-DB digests and produce one merged result
  \ # where later dirs override earlier dirs
  | dirtabase --merge \
