@@ -74,6 +74,15 @@ impl Attrs {
     }
 }
 
+#[macro_export]
+macro_rules! at {
+    ( $( $k:expr => $v:expr ),* ) => {
+        {
+            Attrs::new() $( .append(stringify!($k), $v) )*
+        }
+    };
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -109,6 +118,16 @@ mod test {
             .append("SECOND", "2")
             .append("THIRD", "3");
         assert_eq!(attrs.0[2], Attr::new("THIRD", "3"));
+    }
+
+    #[test]
+    fn at_macro() {
+        let attrs = Attrs::new()
+            .append("A", "1")
+            .append("B", "2")
+            .append("C", "3")
+            .append("B", "4");
+        assert_eq!(at!{ A=>"1", B=>"2", C=>"3", B=>"4" }, attrs);
     }
 
     #[test]
