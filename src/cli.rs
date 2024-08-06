@@ -15,6 +15,9 @@ const USAGE: &'static str = indoc! {"
     # Consumes the last N items of the stack, where N is the number of params.
      --export .
 
+    # Merge all archives on the stack into one, consuming them.
+     --merge
+
     # In each archive, filter files and directories by matching their
     # path against a regular expression.
      --filter '^/hello'
@@ -42,6 +45,7 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
             "--help" => return Behavior::Help,
             "--import" => pipeline.push(PipelineStep(Op::Import, vec![])),
             "--export" => pipeline.push(PipelineStep(Op::Export, vec![])),
+            "--merge" => pipeline.push(PipelineStep(Op::Merge, vec![])),
             "--filter" => pipeline.push(PipelineStep(Op::Filter, vec![])),
 
             other => if pipeline.is_empty() {

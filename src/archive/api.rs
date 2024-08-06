@@ -48,9 +48,14 @@ pub fn filter(ar: Archive, criteria: &Regex) -> Archive {
     }).collect()
 }
 
+pub fn merge(ars: &[Archive]) -> Archive {
+    crate::archive::normalize::normalize(&ars.concat())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::at;
 
     #[test]
     fn round_trip_encoding() {
@@ -107,5 +112,27 @@ mod test {
                 digest: "xyz".into(),
             },
         ])
+    }
+
+    #[test]
+    fn test_merge() {
+        let ar1: Archive = vec![
+            Entry::Dir { path: "/uniq/1".into(), attrs: at!{ AR=>"1" } },
+            Entry::Dir { path: "/common".into(), attrs: at!{ AR=>"1" } },
+        ];
+        let ar2: Archive = vec![
+            Entry::Dir { path: "/uniq/2".into(), attrs: at!{ AR=>"2" } },
+            Entry::Dir { path: "/common".into(), attrs: at!{ AR=>"2" } },
+        ];
+        let ar3: Archive = vec![
+            Entry::Dir { path: "/uniq/3".into(), attrs: at!{ AR=>"3" } },
+            Entry::Dir { path: "/common".into(), attrs: at!{ AR=>"3" } },
+        ];
+        assert_eq!(merge(&[ar1, ar2, ar3]), vec![
+            Entry::Dir { path: "/uniq/3".into(), attrs: at!{ AR=>"3" } },
+            Entry::Dir { path: "/uniq/2".into(), attrs: at!{ AR=>"2" } },
+            Entry::Dir { path: "/uniq/1".into(), attrs: at!{ AR=>"1" } },
+            Entry::Dir { path: "/common".into(), attrs: at!{ AR=>"3" } },
+        ]);
     }
 }

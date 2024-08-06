@@ -41,7 +41,7 @@ output stream format of `dirtabase` Operators.
 #### Currently implemented from example:
 
  * [X] import
- * [ ] merge
+ * [X] merge
  * [ ] prefix
  * [ ] cmd-impure
  * [X] filter

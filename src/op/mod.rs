@@ -1,7 +1,7 @@
-use crate::archive::core::{Triad,TriadFormat};
+use crate::archive::core::{Archive, ArchiveFormat, Compression, Triad, TriadFormat};
 use crate::storage::traits::*;
-use std::io::{Error, Result};
 use regex::Regex;
+use std::io::{Error, Result};
 
 // TODO: Multi-backend interaction
 
@@ -9,6 +9,7 @@ use regex::Regex;
 pub enum Op {
     Import,
     Export,
+    Merge,
     Filter,
 }
 
@@ -21,6 +22,7 @@ pub fn perform(
     match op {
         Op::Import => import(store, triads, params),
         Op::Export => export(store, triads, params),
+        Op::Merge => merge(store, triads),
         Op::Filter => filter(store, triads, params),
     }
 }
@@ -49,13 +51,36 @@ fn export(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Resu
     assert_eq!(to_export.len(), params.len());
 
     for (triad, dir) in std::iter::zip(to_export, params) {
-        crate::stream::archive::source(
-            store,
-            triad,
-            crate::stream::osdir::sink(dir))?
+        crate::stream::archive::source(store, triad, crate::stream::osdir::sink(dir))?
     }
 
     Ok(output)
+}
+
+fn _read_archive(store: &impl Storage, t: &Triad) -> Result<Archive> {
+    let (f, c, d) = (t.0, t.1, t.2);
+    let f = match f {
+        TriadFormat::File => Err(Error::other("All input triads must be archives")),
+        TriadFormat::Archive(f) => Ok(f),
+    };
+    crate::archive::api::read_archive(f?, c, &d, store)
+}
+
+fn _write_archive(store: &impl Storage, ar: &Archive) -> Result<Triad> {
+    let f = ArchiveFormat::JSON;
+    let c = Compression::Plain;
+    let digest = crate::archive::api::write_archive(ar, f, c, store)?;
+    Ok(Triad(TriadFormat::Archive(f), c, digest))
+}
+
+fn merge(store: &impl Storage, triads: Vec<Triad>) -> Result<Vec<Triad>> {
+    let ars = triads
+        .iter()
+        .map(|t| _read_archive(store, t))
+        .collect::<Result<Vec<Archive>>>()?;
+    let merged = crate::archive::api::merge(&ars[..]);
+    let triad = _write_archive(store, &merged)?;
+    Ok(vec![triad])
 }
 
 fn filter(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
@@ -65,15 +90,9 @@ fn filter(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Resu
     let criteria = Regex::new(&params[0]).map_err(|e| Error::other(e))?;
     let mut output: Vec<Triad> = vec![];
     for t in triads {
-        let (f, c, d) = (t.0, t.1, t.2);
-        let f = match f {
-            TriadFormat::File => return Err(Error::other("All input triads must be archives")),
-            TriadFormat::Archive(f) => f,
-        };
-        let ar = crate::archive::api::read_archive(f, c, &d, store)?;
+        let ar = _read_archive(store, &t)?;
         let ar = crate::archive::api::filter(ar, &criteria);
-        let digest = crate::archive::api::write_archive(&ar, f, c, store)?;
-        output.push(Triad(TriadFormat::Archive(f), c, digest));
+        output.push(_write_archive(store, &ar)?);
     }
     Ok(output)
 }
@@ -85,6 +104,7 @@ mod test {
     use crate::digest::Digest;
     use crate::storage::simple::storage;
     use crate::stream::core::Sink;
+    use indoc::indoc;
     use tempfile::tempdir;
 
     fn fixture_triad() -> Result<Triad> {
@@ -151,6 +171,34 @@ mod test {
     }
 
     #[test]
+    fn merge() -> Result<()> {
+        let store_dir = tempdir()?;
+        let store = storage(store_dir.path())?;
+        use crate::stream::archive::sink;
+
+        let triad_dbg = crate::stream::debug::source(sink(&store))?;
+        let triad_fix = crate::stream::osdir::source("./fixture", sink(&store))?;
+
+        let merged = perform(Op::Merge, &store, vec![triad_dbg, triad_fix], vec![])?;
+        assert_eq!(merged.len(), 1);
+        let txt = crate::stream::archive::source(&store, merged[0], crate::stream::debug::sink())?;
+        assert_eq!(txt, indoc! {"
+          FILE /some/dir/hello.txt
+            Length: 17
+            AnotherAttr: for example purposes
+          FILE /file_at_root.txt
+            Length: 37
+          FILE /dir1/dir2/nested.txt
+            Length: 41
+          DIR /dir1/dir2
+          DIR /dir1
+          DIR /a/directory
+            Foo: Bar
+        "});
+        Ok(())
+    }
+
+    #[test]
     fn filter() -> Result<()> {
         let out = tempdir()?;
         let store_dir = tempdir()?;
@@ -162,7 +210,7 @@ mod test {
         assert_eq!(exported, vec![]);
         assert!(out.path().join("dir1/dir2").exists());
         assert!(out.path().join("dir1/dir2/nested.txt").exists());
-        assert!(! out.path().join("file_at_root.txt").exists());
+        assert!(!out.path().join("file_at_root.txt").exists());
         Ok(())
     }
 }
