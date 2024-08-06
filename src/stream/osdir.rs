@@ -11,7 +11,7 @@ use crate::attr::*;
 use crate::stream::core::Sink;
 use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
-use tempdir::TempDir;
+use tempfile::{tempdir_in,TempDir};
 
 /// Read from a real directory and emit to the given sink.
 ///
@@ -82,7 +82,7 @@ impl OsdirSink {
         let parent = pb
             .parent()
             .expect("Could not get parent of osdir::sink destination");
-        let tmp = TempDir::new_in(parent, ".dirtabase").expect("Could not allocate tempdir");
+        let tmp = tempdir_in(parent).expect("Could not allocate tempdir");
         Self { tmp: tmp, dest: pb }
     }
 
@@ -148,10 +148,11 @@ where
 mod test {
     use super::*;
     use std::io::Cursor;
+    use tempfile::tempdir;
 
     #[test]
     fn osdir_sink() -> Result<()> {
-        let tmp_dest = TempDir::new("dirtabase")?;
+        let tmp_dest = tempdir()?;
         let dest = tmp_dest.path();
 
         OsdirSink::new(dest)
@@ -171,7 +172,7 @@ mod test {
 
     #[test]
     fn osdir_round_trip() -> Result<()> {
-        let tmp_dest = TempDir::new("dirtabase")?;
+        let tmp_dest = tempdir()?;
         let dest = tmp_dest.path();
 
         source("./fixture", OsdirSink::new(dest))?;

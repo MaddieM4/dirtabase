@@ -133,12 +133,12 @@ impl Labels for SimpleLabels {
 #[cfg(test)]
 mod test {
     use super::*;
-    use tempdir::TempDir;
+    use tempfile::tempdir;
     use std::io::Read;
 
     #[test]
     fn cas_read() -> io::Result<()> {
-        let dir = TempDir::new("dirtabase")?;
+        let dir = tempdir()?;
         let store = storage(&dir)?;
         let d: Digest = "some text".into();
         let path = dir.path().join("cas").join(d.to_hex());
@@ -157,7 +157,7 @@ mod test {
 
     #[test]
     fn cas_write() -> io::Result<()> {
-        let dir = TempDir::new("dirtabase")?;
+        let dir = tempdir()?;
         let store = storage(&dir)?;
         let contents = "some text";
         let d: Digest = contents.into();
@@ -178,7 +178,7 @@ mod test {
 
     #[test]
     fn lab_read() -> io::Result<()> {
-        let dir = TempDir::new("dirtabase")?;
+        let dir = tempdir()?;
         let store = storage(&dir)?;
         let lab = Label::new("@foo").unwrap();
         let path = dir.path().join("labels/@foo");
@@ -195,7 +195,7 @@ mod test {
 
     #[test]
     fn lab_write() -> io::Result<()> {
-        let dir = TempDir::new("dirtabase")?;
+        let dir = tempdir()?;
         let store = storage(&dir)?;
         let lab = Label::new("@foo").unwrap();
         let path = dir.path().join("labels/@foo");
