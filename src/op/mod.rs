@@ -28,7 +28,7 @@ pub fn perform(
 fn import(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
     let mut output = triads;
     for p in params {
-        let sink = crate::archive::stream::ArchiveSink::new(store);
+        let sink = crate::stream::archive::sink(store);
         let triad = crate::stream::osdir::source(p, sink)?;
         output.push(triad)
     }
@@ -49,7 +49,7 @@ fn export(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Resu
     assert_eq!(to_export.len(), params.len());
 
     for (triad, dir) in std::iter::zip(to_export, params) {
-        crate::archive::stream::archive_source(
+        crate::stream::archive::source(
             store,
             triad,
             crate::stream::osdir::sink(dir))?
@@ -90,7 +90,7 @@ mod test {
     fn fixture_triad() -> Result<Triad> {
         let dir = tempdir()?;
         let store = storage(dir.path())?;
-        let sink = crate::archive::stream::ArchiveSink::new(&store);
+        let sink = crate::stream::archive::sink(&store);
 
         sink.send_file(
             "/file_at_root.txt",
