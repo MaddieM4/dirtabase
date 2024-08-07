@@ -15,8 +15,11 @@ $ dirtabase \
   --cmd-impure 'find misc -type f | xargs md5sum > sums' \
   --filter '^/sums' \
   --export out
+```
 
-# (here's what it'd output)
+Here's what it'd output:
+
+```
 --- Import ---
 json-plain-c6ef2ee35a879ac0d1ae28296fd22040b8de5a32f7cc6e26eead1678b8243745
 json-plain-d6467585a5b63a42945759efd8c8a21dfd701470253339477407653e48a3643a
@@ -30,8 +33,11 @@ json-plain-fc0f1953c55e18c006896ac591e866eea53d46e0ccd1671a023530388ab854ab
 --- Filter ---
 json-plain-150e580c81762725735a4a4936727401ff8e0b567c0d00b34dc572b0e073eff9
 --- Export ---
+```
 
-# And you can poke around at the output!
+And you can poke around at the directory you just made!
+
+```bash
 $ ls out
 sums
 
