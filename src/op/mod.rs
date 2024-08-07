@@ -1,3 +1,6 @@
+mod cmd;
+use cmd::cmd_impure;
+
 use crate::archive::core::{Archive, ArchiveFormat, Compression, Triad, TriadFormat};
 use crate::storage::traits::*;
 use regex::Regex;
@@ -13,6 +16,7 @@ pub enum Op {
     Filter,
     Replace,
     Prefix,
+    CmdImpure,
 }
 
 pub fn perform(
@@ -28,6 +32,7 @@ pub fn perform(
         Op::Filter => filter(store, triads, params),
         Op::Replace => replace(store, triads, params),
         Op::Prefix => prefix(store, triads, params),
+        Op::CmdImpure => cmd_impure(store, triads, params),
     }
 }
 

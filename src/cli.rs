@@ -1,5 +1,6 @@
 use indoc::indoc;
 use std::io::Write;
+use std::process::ExitCode;
 use crate::archive::core::Triad;
 use crate::op::{Op,perform as perform_op};
 
@@ -28,6 +29,9 @@ const USAGE: &'static str = indoc! {"
 
     # Rename entries in an archive, restricted to changing the START of paths.
      --prefix 'overly/nested/' ''
+
+    # Unpack an archive to a tempdir, run a command there, and reimport the directory.
+     --cmd-impure 'echo \"some text\" > file.txt'
 "};
 
 #[derive(PartialEq,Debug)]
@@ -55,6 +59,7 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
             "--filter" => pipeline.push(PipelineStep(Op::Filter, vec![])),
             "--replace" => pipeline.push(PipelineStep(Op::Replace, vec![])),
             "--prefix" => pipeline.push(PipelineStep(Op::Prefix, vec![])),
+            "--cmd-impure" => pipeline.push(PipelineStep(Op::CmdImpure, vec![])),
 
             other => if pipeline.is_empty() {
                 return Behavior::UnexpectedArg(other.to_owned())
@@ -74,13 +79,20 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
 }
 
 
-pub fn execute(behavior: Behavior, stdout: &mut impl Write) {
-    match behavior {
+pub fn execute(behavior: Behavior, stdout: &mut impl Write) -> ExitCode {
+    let result = match behavior {
         Behavior::Help => write!(stdout, "{}", USAGE),
         Behavior::Version => write!(stdout, "{}\n", env!("CARGO_PKG_VERSION")),
         Behavior::UnexpectedArg(a) => write!(stdout, "Unexpected argument: {}\n", a),
         Behavior::Pipeline(steps) => execute_pipeline(steps, stdout),
-    }.expect("Failed to execute");
+    };
+    match result {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(e) => {
+            write!(stdout, "Failed to execute: {:?}\n", e).expect("Failed to print failure msg");
+            ExitCode::from(1)
+        }
+    }
 }
 
 fn execute_pipeline(steps: Vec<PipelineStep>, stdout: &mut impl Write) -> std::io::Result<()> {
@@ -88,8 +100,8 @@ fn execute_pipeline(steps: Vec<PipelineStep>, stdout: &mut impl Write) -> std::i
     let mut triads: Vec<Triad> = vec![];
     for step in steps {
         let (op, params) = (step.0, step.1);
-        triads = perform_op(op, &store, triads, params)?;
         write!(stdout, "--- {:?} ---\n", op)?;
+        triads = perform_op(op, &store, triads, params)?;
         for t in &triads {
             write!(stdout, "{}\n", t)?;
         }

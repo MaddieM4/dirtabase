@@ -11,8 +11,9 @@ mod stream;
 
 use std::env::args;
 use std::io::stdout;
+use std::process::ExitCode;
 
-fn main() {
+fn main() -> ExitCode {
     let behavior = cli::parse(args().skip(1));
-    cli::execute(behavior, &mut stdout());
+    cli::execute(behavior, &mut stdout())
 }
