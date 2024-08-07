@@ -7,45 +7,63 @@ Allows for manipulating immutable directories as objects that can pass between
 processes. It's going to be the backbone of the `layover` package manager.
 
 ```bash
-dirtabase \
-  --import some/directory some/other/directory \
+# Run this command in this repo!
+$ dirtabase \
+  --import src fixture \
   --merge \
-  --prefix some '' \
-  --cmd-impure 'find -type f | xargs md5sum > sums' \
+  --prefix '' misc/ \
+  --cmd-impure 'find misc -type f | xargs md5sum > sums' \
   --filter '^/sums' \
-  --export .
+  --export out
 
-# --------------
-# Equivalent to:
-# --------------
+# (here's what it'd output)
+--- Import ---
+json-plain-c6ef2ee35a879ac0d1ae28296fd22040b8de5a32f7cc6e26eead1678b8243745
+json-plain-d6467585a5b63a42945759efd8c8a21dfd701470253339477407653e48a3643a
+--- Merge ---
+json-plain-97e19e493248433a639a916620fe6849998058f354cff414e339ce52b8155685
+--- Prefix ---
+json-plain-90f16a5cd6faf1bc5c3455dad18efddf27295d7127136d6c52991524e268ea30
+--- CmdImpure ---
+--- [find misc -type f | xargs md5sum > sums] ---
+json-plain-fc0f1953c55e18c006896ac591e866eea53d46e0ccd1671a023530388ab854ab
+--- Filter ---
+json-plain-150e580c81762725735a4a4936727401ff8e0b567c0d00b34dc572b0e073eff9
+--- Export ---
 
-# Bring external files into DB, printing a digest for each
-dirtabase --import some/directory some/other/directory \
- \ # Consume multiple in-DB digests and produce one merged result
- \ # where later dirs override earlier dirs
- | dirtabase --merge \
- \ # Strip 'some' off the start of filenames within dirs
- | dirtabase --prefix some ''
- \ # Run a command on each top level directory that passes through
- | dirtabase --cmd-impure 'find -type f | xargs md5sum > sums.txt'
- \ # Filter top level directories so each only has matching files
- | dirtabase --filter '^/sums'
- \ # Put files into the current OS directory (should just be ./sums.txt in this case)
- | dirtabase --export .
+# And you can poke around at the output!
+$ ls out
+sums
+
+$ cat out
+e2af4a9feae56aae3cdb746746fb3e53  misc/cli.rs
+50cd68ca08155c7edf90a27f8b96d3de  misc/archive/mod.rs
+26d38af62510f25049629bbe0ed034ca  misc/archive/core.rs
+8992012555033d4f1ef994c76369df7a  misc/archive/normalize.rs
+4b3ede399b76bb628dd8126a0b21a76a  misc/archive/api.rs
+a93e3e781bd142655aa4330620c94574  misc/op/mod.rs
+c37128567009ebaa7b3bc79cf18ad110  misc/op/cmd.rs
+66fe2517f5c22e17e830a25602e110b3  misc/digest.rs
+dfe710d9f603c791106f3f2472d56f74  misc/stream/mod.rs
+ee9904318c3b80ee901e0ed23a1d7441  misc/stream/core.rs
+9787349243c44d8340fe6ffaa06f63e3  misc/stream/osdir.rs
+144d465f78e3bbd33d46f0585c514eec  misc/stream/archive.rs
+241f545cf7c26e72cfdfb2839683d348  misc/stream/debug.rs
+429227c7d2bf39a268455c141e128eb0  misc/attr.rs
+54d6fb85bf9f831812f93c21ea914f3c  misc/main.rs
+9d358d667fe119ed3a8a98faeb0de40b  misc/dir1/dir2/nested.txt
+167fce463d52ee9fc7058a7887fab2ec  misc/label.rs
+df89b4c7ad822e8823269320117e4e96  misc/storage/mod.rs
+c2ad5a560c4bd82ebed21abfd444a5f8  misc/storage/core.rs
+17880d64921d32ef670d412fb05cf418  misc/storage/traits.rs
+eb6f71ea9c0627e30d358601dd2eb658  misc/storage/simple.rs
+c2333d995e4dbacab98f9fa37a1201a9  misc/file_at_root.txt
+5d4848dbb6f29792b773a6d78a84f06c  misc/lib.rs
 ```
 
 At each step, the interface is a stream of digests or other references
 passing from one stage of processing to the next. That's the input and
 output stream format of `dirtabase` Operators.
-
-#### Currently implemented from example:
-
- * [X] import
- * [X] merge
- * [ ] prefix
- * [ ] cmd-impure
- * [X] filter
- * [X] export
 
 ## URL format
 
