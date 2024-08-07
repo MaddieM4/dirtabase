@@ -3,6 +3,10 @@ name = "dirtabase"
 version = "0.1.0"
 edition = "2021"
 
+[profile.profiling]
+inherits = "release"
+debug = true
+
 [dependencies]
 hex = "0.4.3"
 serde = { version="1.0.204", features=["derive"] }
