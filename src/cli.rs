@@ -21,6 +21,10 @@ const USAGE: &'static str = indoc! {"
     # Filter an archive, keeping only the files where the path matches the pattern.
      --filter '^/hello'
      --filter 'x|y'
+
+    # Rename entries in an archive with a regex find and replace.
+     --replace 'foe' 'friend'
+     --replace '\\.([a-z]*)$' '.${1}.old'
 "};
 
 #[derive(PartialEq,Debug)]
@@ -46,6 +50,7 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
             "--export" => pipeline.push(PipelineStep(Op::Export, vec![])),
             "--merge" => pipeline.push(PipelineStep(Op::Merge, vec![])),
             "--filter" => pipeline.push(PipelineStep(Op::Filter, vec![])),
+            "--replace" => pipeline.push(PipelineStep(Op::Replace, vec![])),
 
             other => if pipeline.is_empty() {
                 return Behavior::UnexpectedArg(other.to_owned())

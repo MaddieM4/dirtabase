@@ -11,6 +11,7 @@ pub enum Op {
     Export,
     Merge,
     Filter,
+    Replace,
 }
 
 pub fn perform(
@@ -24,6 +25,7 @@ pub fn perform(
         Op::Export => export(store, triads, params),
         Op::Merge => merge(store, triads),
         Op::Filter => filter(store, triads, params),
+        Op::Replace => replace(store, triads, params),
     }
 }
 
@@ -96,6 +98,20 @@ fn filter(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Resu
     let mut triads = triads;
     let t = triads.pop().ok_or(Error::other("Need an archive to filter"))?;
     let ar = crate::archive::api::filter(_read_archive(store, &t)?, &criteria);
+    triads.push(_write_archive(store, &ar)?);
+    Ok(triads)
+}
+
+fn replace(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
+    if params.len() != 2 {
+        return _err("--replace takes exactly 2 params (pattern, replacement)");
+    }
+    let re = Regex::new(&params[0]).map_err(|e| Error::other(e))?;
+    let replacement = &params[1];
+
+    let mut triads = triads;
+    let t = triads.pop().ok_or(Error::other("Need an archive to replace on"))?;
+    let ar = crate::archive::api::replace(_read_archive(store, &t)?, &re, replacement);
     triads.push(_write_archive(store, &ar)?);
     Ok(triads)
 }
@@ -214,6 +230,33 @@ mod test {
         assert!(out.path().join("dir1/dir2").exists());
         assert!(out.path().join("dir1/dir2/nested.txt").exists());
         assert!(!out.path().join("file_at_root.txt").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn replace() -> Result<()> {
+        let store_dir = tempdir()?;
+        let store = storage(store_dir.path())?;
+        use crate::stream::archive::sink;
+
+        let triad_dbg = crate::stream::debug::source(sink(&store))?;
+        let triad_fix = crate::stream::osdir::source("./fixture", sink(&store))?;
+
+        // Should only affect last triad
+        let output = perform(Op::Replace, &store, vec![triad_dbg, triad_fix], vec!["root".into(), "boot".into()])?;
+        assert_eq!(output.len(), 2);
+        assert_eq!(output[0], triad_dbg);
+
+        // Let's read out the transformed item from the top of the stack
+        let txt = crate::stream::archive::source(&store, output[1], crate::stream::debug::sink())?;
+        assert_eq!(txt, indoc! {"
+          FILE /file_at_boot.txt
+            Length: 37
+          FILE /dir1/dir2/nested.txt
+            Length: 41
+          DIR /dir1/dir2
+          DIR /dir1
+        "});
         Ok(())
     }
 }
