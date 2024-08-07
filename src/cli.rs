@@ -18,8 +18,7 @@ const USAGE: &'static str = indoc! {"
     # Merge all archives on the stack into one, consuming them.
      --merge
 
-    # In each archive, filter files and directories by matching their
-    # path against a regular expression.
+    # Filter an archive, keeping only the files where the path matches the pattern.
      --filter '^/hello'
      --filter 'x|y'
 "};

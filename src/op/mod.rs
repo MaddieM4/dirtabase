@@ -57,10 +57,14 @@ fn export(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Resu
     Ok(output)
 }
 
+fn _err<T>(text: &'static str) -> Result<T> {
+    Err(Error::other(text))
+}
+
 fn _read_archive(store: &impl Storage, t: &Triad) -> Result<Archive> {
     let (f, c, d) = (t.0, t.1, t.2);
     let f = match f {
-        TriadFormat::File => Err(Error::other("All input triads must be archives")),
+        TriadFormat::File => _err("All input triads must be archives"),
         TriadFormat::Archive(f) => Ok(f),
     };
     crate::archive::api::read_archive(f?, c, &d, store)
@@ -85,16 +89,15 @@ fn merge(store: &impl Storage, triads: Vec<Triad>) -> Result<Vec<Triad>> {
 
 fn filter(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
     if params.len() != 1 {
-        return Err(Error::other("--filter takes exactly 1 param"));
+        return _err("--filter takes exactly 1 param");
     }
     let criteria = Regex::new(&params[0]).map_err(|e| Error::other(e))?;
-    let mut output: Vec<Triad> = vec![];
-    for t in triads {
-        let ar = _read_archive(store, &t)?;
-        let ar = crate::archive::api::filter(ar, &criteria);
-        output.push(_write_archive(store, &ar)?);
-    }
-    Ok(output)
+
+    let mut triads = triads;
+    let t = triads.pop().ok_or(Error::other("Need an archive to filter"))?;
+    let ar = crate::archive::api::filter(_read_archive(store, &t)?, &criteria);
+    triads.push(_write_archive(store, &ar)?);
+    Ok(triads)
 }
 
 #[cfg(test)]
