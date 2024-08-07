@@ -25,6 +25,9 @@ const USAGE: &'static str = indoc! {"
     # Rename entries in an archive with a regex find and replace.
      --replace 'foe' 'friend'
      --replace '\\.([a-z]*)$' '.${1}.old'
+
+    # Rename entries in an archive, restricted to changing the START of paths.
+     --prefix 'overly/nested/' ''
 "};
 
 #[derive(PartialEq,Debug)]
@@ -51,6 +54,7 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
             "--merge" => pipeline.push(PipelineStep(Op::Merge, vec![])),
             "--filter" => pipeline.push(PipelineStep(Op::Filter, vec![])),
             "--replace" => pipeline.push(PipelineStep(Op::Replace, vec![])),
+            "--prefix" => pipeline.push(PipelineStep(Op::Prefix, vec![])),
 
             other => if pipeline.is_empty() {
                 return Behavior::UnexpectedArg(other.to_owned())
