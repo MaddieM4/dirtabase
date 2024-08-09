@@ -9,11 +9,14 @@ const USAGE: &'static str = indoc! {"
 
     A pipeline is made of one or more operations:
 
-    # Import external files into database
+    # Put an empty archive on the top of the stack
+     --empty
+
+    # Import external files into database (each param becomes an archive).
      --import dir1 dir2 ... dirN
 
     # Export files from the DB to the operating system.
-    # Consumes the last N items of the stack, where N is the number of params.
+    # Consumes the last N archives on the stack, where N is the number of params.
      --export .
 
     # Merge all archives on the stack into one, consuming them.
@@ -53,6 +56,7 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
         match arg.as_ref() {
             "--version" => return Behavior::Version,
             "--help" => return Behavior::Help,
+            "--empty" => pipeline.push(PipelineStep(Op::Empty, vec![])),
             "--import" => pipeline.push(PipelineStep(Op::Import, vec![])),
             "--export" => pipeline.push(PipelineStep(Op::Export, vec![])),
             "--merge" => pipeline.push(PipelineStep(Op::Merge, vec![])),

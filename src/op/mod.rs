@@ -1,15 +1,14 @@
-mod cmd;
-use cmd::cmd_impure;
-
-use crate::archive::core::{Archive, ArchiveFormat, Compression, Triad, TriadFormat};
+mod ctx;
+use crate::op::ctx::Context;
+use crate::archive::core::Triad;
 use crate::storage::traits::*;
-use regex::Regex;
-use std::io::{Error, Result};
+use std::io::Result;
 
 // TODO: Multi-backend interaction
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Op {
+    Empty,
     Import,
     Export,
     Merge,
@@ -26,123 +25,21 @@ pub fn perform(
     params: Vec<String>,
 ) -> Result<Vec<Triad>> {
     match op {
-        Op::Import => import(store, triads, params),
-        Op::Export => export(store, triads, params),
-        Op::Merge => merge(store, triads),
-        Op::Filter => filter(store, triads, params),
-        Op::Replace => replace(store, triads, params),
-        Op::Prefix => prefix(store, triads, params),
-        Op::CmdImpure => cmd_impure(store, triads, params),
+        Op::Empty => Ok(Context::new_from(store, triads).empty()?.triads),
+        Op::Import => Ok(Context::new_from(store, triads).import(params)?.triads),
+        Op::Export => Ok(Context::new_from(store, triads).export(params)?.triads),
+        Op::Merge => Ok(Context::new_from(store, triads).merge()?.triads),
+        Op::Filter => Ok(Context::new_from(store, triads).filter(params)?.triads),
+        Op::Replace => Ok(Context::new_from(store, triads).replace(params)?.triads),
+        Op::Prefix => Ok(Context::new_from(store, triads).prefix(params)?.triads),
+        Op::CmdImpure => Ok(Context::new_from(store, triads).cmd_impure(params)?.triads),
     }
-}
-
-fn import(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
-    let mut output = triads;
-    for p in params {
-        let sink = crate::stream::archive::sink(store);
-        let triad = crate::stream::osdir::source(p, sink)?;
-        output.push(triad)
-    }
-    Ok(output)
-}
-
-fn export(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
-    if params.len() > triads.len() {
-        return Err(Error::other(format!(
-            "Cannot do {} exports when given only {} input archives",
-            params.len(),
-            triads.len(),
-        )));
-    }
-
-    let mut output = triads;
-    let to_export = output.split_off(output.len() - params.len());
-    assert_eq!(to_export.len(), params.len());
-
-    for (triad, dir) in std::iter::zip(to_export, params) {
-        crate::stream::archive::source(store, triad, crate::stream::osdir::sink(dir))?
-    }
-
-    Ok(output)
-}
-
-fn _err<T>(text: &'static str) -> Result<T> {
-    Err(Error::other(text))
-}
-
-fn _read_archive(store: &impl Storage, t: &Triad) -> Result<Archive> {
-    let (f, c, d) = (t.0, t.1, t.2);
-    let f = match f {
-        TriadFormat::File => _err("All input triads must be archives"),
-        TriadFormat::Archive(f) => Ok(f),
-    };
-    crate::archive::api::read_archive(f?, c, &d, store)
-}
-
-fn _write_archive(store: &impl Storage, ar: &Archive) -> Result<Triad> {
-    let f = ArchiveFormat::JSON;
-    let c = Compression::Plain;
-    let digest = crate::archive::api::write_archive(ar, f, c, store)?;
-    Ok(Triad(TriadFormat::Archive(f), c, digest))
-}
-
-fn merge(store: &impl Storage, triads: Vec<Triad>) -> Result<Vec<Triad>> {
-    let ars = triads
-        .iter()
-        .map(|t| _read_archive(store, t))
-        .collect::<Result<Vec<Archive>>>()?;
-    let merged = crate::archive::api::merge(&ars[..]);
-    let triad = _write_archive(store, &merged)?;
-    Ok(vec![triad])
-}
-
-fn filter(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
-    if params.len() != 1 {
-        return _err("--filter takes exactly 1 param");
-    }
-    let criteria = Regex::new(&params[0]).map_err(|e| Error::other(e))?;
-
-    let mut triads = triads;
-    let t = triads
-        .pop()
-        .ok_or(Error::other("Need an archive to filter"))?;
-    let ar = crate::archive::api::filter(_read_archive(store, &t)?, &criteria);
-    triads.push(_write_archive(store, &ar)?);
-    Ok(triads)
-}
-
-fn replace(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
-    if params.len() != 2 {
-        return _err("--replace takes exactly 2 params (pattern, replacement)");
-    }
-    let re = Regex::new(&params[0]).map_err(|e| Error::other(e))?;
-    let replacement = &params[1];
-
-    let mut triads = triads;
-    let t = triads
-        .pop()
-        .ok_or(Error::other("Need an archive to replace on"))?;
-    let ar = crate::archive::api::replace(_read_archive(store, &t)?, &re, replacement);
-    triads.push(_write_archive(store, &ar)?);
-    Ok(triads)
-}
-
-fn prefix(store: &impl Storage, triads: Vec<Triad>, params: Vec<String>) -> Result<Vec<Triad>> {
-    if params.len() != 2 {
-        return _err("--prefix takes exactly 2 params (pattern, replacement)");
-    }
-    fn fix(pre_wanted: &str, input: &str) -> String {
-        pre_wanted.to_owned() + input.trim_start_matches("^").trim_start_matches("/")
-    }
-    let pattern = fix("^/", &params[0]);
-    let replacement = fix("/", &params[1]);
-    replace(store, triads, vec![pattern, replacement])
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::archive::core::{Attrs, Compression};
+    use crate::archive::core::{Attrs, Compression, TriadFormat};
     use crate::digest::Digest;
     use crate::storage::simple::storage;
     use crate::stream::core::Sink;
