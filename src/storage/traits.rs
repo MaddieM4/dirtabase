@@ -18,7 +18,6 @@
 //! ```
 
 use crate::digest::Digest;
-use crate::label::Label;
 use std::io::{Read,Result,Cursor};
 
 /// Content-addressed storage interface.
@@ -35,20 +34,4 @@ pub trait CAS {
     fn write_buf(&self, buf: impl AsRef<[u8]>) -> Result<Digest> {
         self.write(Cursor::new(buf))
     }
-}
-
-/// The part of a store that houses mutable labels.
-///
-/// It's worth noting that the interpretation of bytes within a label is, at
-/// the raw storage level, entirely arbitrary and left as an exercise to the
-/// caller. However, other parts of the Dirtabase codebase will use a specific
-/// consistent format. The only assumption at the _storage_ level is that these
-/// will be, in _some_ form, a **reasonably small** reference to something in
-/// the CAS section of the same Storage.
-pub trait Labels {
-    /// Get the current value of a label.
-    fn read(&self, name: &Label) -> Result<Vec<u8>>;
-
-    /// Set the current value of a label.
-    fn write(&self, name: &Label, value: impl AsRef<[u8]>) -> Result<()>;
 }

@@ -96,7 +96,14 @@ impl CAS for SimpleCAS {
     }
 }
 
-/// Mutable label management.
+/// The part of a store that houses mutable labels.
+///
+/// It's worth noting that the interpretation of bytes within a label is, at
+/// the raw storage level, entirely arbitrary and left as an exercise to the
+/// caller. However, other parts of the Dirtabase codebase will use a specific
+/// consistent format. The only assumption at the _storage_ level is that these
+/// will be, in _some_ form, a **reasonably small** reference to something in
+/// the CAS section of the same Storage.
 pub struct SimpleLabels(PathBuf);
 impl SimpleLabels {
     fn new(path: impl AsRef<Path>) -> io::Result<Self> {
@@ -104,9 +111,9 @@ impl SimpleLabels {
         std::fs::create_dir_all(&path)?;
         Ok(Self(path))
     }
-}
-impl Labels for SimpleLabels {
-    fn read(&self, name: &Label) -> io::Result<Vec<u8>> {
+
+    /// Get the current value of a label.
+    pub fn read(&self, name: &Label) -> io::Result<Vec<u8>> {
         match std::fs::read(&self.0.join(name.as_path())) {
             Ok(bytes) => Ok(bytes),
             Err(e) => match e.kind() {
@@ -116,7 +123,8 @@ impl Labels for SimpleLabels {
         }
     }
 
-    fn write(&self, name: &Label, value: impl AsRef<[u8]>) -> io::Result<()> {
+    /// Set the current value of a label.
+    pub fn write(&self, name: &Label, value: impl AsRef<[u8]>) -> io::Result<()> {
         let dest = &self.0.join(name.as_path());
         let mut file = NamedTempFile::new_in(&self.0)?;
         file.write_all(value.as_ref())?;
