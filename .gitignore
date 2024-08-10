@@ -7,3 +7,7 @@ out
 
 # Rust compile outputs
 /target
+
+# devenv.sh
+.devenv
+.pre-commit-config.yaml
