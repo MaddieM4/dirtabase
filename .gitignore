@@ -3,5 +3,7 @@
 
 # Temp files
 .dirtabase_db
+out
 
+# Rust compile outputs
 /target

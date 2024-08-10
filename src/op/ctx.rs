@@ -1,4 +1,4 @@
-use crate::archive::core::{Archive, ArchiveFormat, Compression, Triad, TriadFormat};
+use crate::archive::core::{Archive, ArchiveFormat, Attrs, Compression, Entry, Triad, TriadFormat};
 use crate::storage::traits::*;
 use regex::Regex;
 use std::io::{Error, Result};
@@ -156,6 +156,30 @@ where
         self.replace(vec![pattern, replacement])
     }
 
+    pub fn download_impure(mut self, params: Vec<String>) -> Result<Self> {
+        if params.len() != 1 {
+            return _err("--download-impure only takes 1 argument");
+        }
+        let given_url = &params[0];
+        let parsed_url = url::Url::parse(&given_url).map_err(|e| Error::other(e))?;
+        let filename = parsed_url
+            .path_segments()
+            .ok_or(Error::other("Could not break URL into path segments"))?
+            .last()
+            .ok_or(Error::other("Could not determine filename"))?;
+
+        let response = reqwest::blocking::get(given_url).map_err(|e| Error::other(e))?;
+        let digest = self.store.cas().write(response)?;
+        let ar = vec![Entry::File {
+            path: ("/".to_owned() + filename).into(),
+            attrs: Attrs::new(),
+            compression: Compression::Plain,
+            digest: digest,
+        }];
+        self.triads.push(self.write(&ar)?);
+        Ok(self)
+    }
+
     pub fn cmd_impure(mut self, params: Vec<String>) -> Result<Self> {
         if params.len() != 1 {
             return _err("--cmd-impure only takes 1 argument");
@@ -194,34 +218,5 @@ where
             crate::stream::osdir::source(&dir, crate::stream::archive::sink(self.store))?;
         self.triads.push(reimport);
         Ok(self)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::storage::simple::storage;
-    use tempfile::tempdir;
-
-    fn build_lua_5_4_7<S>(ctx: Context<S>) -> Result<Triad>
-    where
-        S: Storage,
-    {
-        ctx.empty()?
-            .cmd_impure(vec!["wget https://www.lua.org/ftp/lua-5.4.7.tar.gz".into()])?
-            .cmd_impure(vec!["tar zxf lua-5.4.7.tar.gz".into()])?
-            .filter(vec!["^/lua-5.4.7".into()])?
-            .prefix(vec!["lua-5.4.7".into(), "".into()])?
-            .cmd_impure(vec!["make all test".into()])?
-            .finish()
-    }
-
-    #[test]
-    fn lua_recipe_example() -> Result<()> {
-        let store_dir = tempdir()?;
-        let store = storage(store_dir.path())?;
-        let ctx = Context::new(&store, DEFAULT_ENCODING);
-        let triad = build_lua_5_4_7(ctx)?;
-        Ok(())
     }
 }

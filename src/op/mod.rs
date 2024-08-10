@@ -1,4 +1,4 @@
-mod ctx;
+pub mod ctx;
 use crate::op::ctx::Context;
 use crate::archive::core::Triad;
 use crate::storage::traits::*;
