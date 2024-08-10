@@ -1,4 +1,13 @@
-use crate::archive::core::{Archive, ArchiveFormat, Attrs, Compression, Entry, Triad, TriadFormat};
+use crate::archive::core::{
+    Archive,
+    ArchiveFormat,
+    Attrs,
+    Compression,
+    Digest,
+    Entry,
+    Triad,
+    TriadFormat,
+};
 use crate::storage::traits::*;
 use regex::Regex;
 use std::io::{Error, Result};
@@ -174,8 +183,38 @@ where
             path: ("/".to_owned() + filename).into(),
             attrs: Attrs::new(),
             compression: Compression::Plain,
-            digest: digest,
+            digest: digest.clone(),
         }];
+        print!(">> Downloaded {}\n>> Digest: {}\n", given_url, digest.to_hex());
+        self.triads.push(self.write(&ar)?);
+        Ok(self)
+    }
+
+    pub fn download(mut self, params: Vec<String>) -> Result<Self> {
+        if params.len() != 2 {
+            return _err("--download takes exactly 2 arguments (url, digest)");
+        }
+        let given_url = &params[0];
+        let expected_digest = Digest::from_hex(&params[1]).map_err(|e| Error::other(e))?;
+        let parsed_url = url::Url::parse(&given_url).map_err(|e| Error::other(e))?;
+        let filename = parsed_url
+            .path_segments()
+            .ok_or(Error::other("Could not break URL into path segments"))?
+            .last()
+            .ok_or(Error::other("Could not determine filename"))?;
+
+        let response = reqwest::blocking::get(given_url).map_err(|e| Error::other(e))?;
+        let digest = self.store.cas().write(response)?;
+        if digest != expected_digest {
+            return Err(Error::other(format!("Expected digest {:?}, got {:?}", expected_digest, digest)))
+        }
+        let ar = vec![Entry::File {
+            path: ("/".to_owned() + filename).into(),
+            attrs: Attrs::new(),
+            compression: Compression::Plain,
+            digest: digest.clone(),
+        }];
+        print!(">> Downloaded {}\n>> Digest: {}\n", given_url, digest.to_hex());
         self.triads.push(self.write(&ar)?);
         Ok(self)
     }

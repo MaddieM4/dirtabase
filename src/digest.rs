@@ -61,6 +61,13 @@ impl<const N: usize> D<N> {
     pub fn to_hex(&self) -> String {
         self.to_bytes().encode_hex()
     }
+
+    /// Create a digest from a text hex
+    pub fn from_hex(h: impl AsRef<[u8]>) -> Result<Self, hex::FromHexError> {
+        let mut bytes = [0u8; N];
+        hex::decode_to_slice(h, &mut bytes)?;
+        Ok(Self(bytes))
+    }
 }
 
 impl<const N: usize> std::fmt::Debug for D<N> {
