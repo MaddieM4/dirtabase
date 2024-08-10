@@ -22,7 +22,6 @@
 //! ```
 //! use tempfile::tempdir;
 //! use dirtabase::digest::Digest;
-//! use dirtabase::storage::traits::*;
 //! use dirtabase::storage::simple;
 //!
 //! let dir = tempdir()?;
@@ -35,7 +34,7 @@
 
 use crate::storage::core::*;
 use tempfile::NamedTempFile;
-use std::io::Write;
+use std::io::{Write,Cursor};
 use sha2::Digest as _;
 
 /// Implementation of the simple storage backend.
@@ -61,11 +60,9 @@ impl SimpleCAS {
         std::fs::create_dir_all(&path)?;
         Ok(Self(path))
     }
-}
-impl CAS for SimpleCAS {
-    type Reader = std::fs::File;
 
-    fn read(&self, digest: &Digest) -> io::Result<Option<Self::Reader>> {
+    /// Get the contents of a resource within the store.
+    pub fn read(&self, digest: &Digest) -> io::Result<Option<std::fs::File>> {
         let path = self.0.join(digest.to_hex()); match std::fs::File::open(path) {
             Ok(f) => Ok(Some(f)),
             Err(e) => match e.kind() {
@@ -74,7 +71,9 @@ impl CAS for SimpleCAS {
             }
         }
     }
-    fn write(&self, mut reader: impl io::Read) -> io::Result<Digest> {
+
+    /// Save a potentially new resource into the store.
+    pub fn write(&self, mut reader: impl io::Read) -> io::Result<Digest> {
         let mut writer = NamedTempFile::new_in(&self.0)?;
         let mut hash = sha2::Sha256::new();
         // Copy data while building digest
@@ -93,6 +92,11 @@ impl CAS for SimpleCAS {
         let d = Digest::from_bytes(raw.as_slice().try_into().unwrap());
         writer.persist(self.0.join(d.to_hex()))?;
         Ok(d)
+    }
+
+    /// Convenience method to write a buffer into the store.
+    pub fn write_buf(&self, buf: impl AsRef<[u8]>) -> io::Result<Digest> {
+        self.write(Cursor::new(buf))
     }
 }
 

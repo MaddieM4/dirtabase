@@ -32,7 +32,6 @@
 
 use crate::archive::api::*;
 use crate::archive::core::*;
-use crate::storage::traits::*;
 use crate::storage::simple::SimpleStorage;
 use crate::stream::core::Sink;
 use std::io::{Cursor, Error, ErrorKind, Read, Result};

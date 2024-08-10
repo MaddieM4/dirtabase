@@ -1,6 +1,5 @@
 use crate::archive::core::*;
 use crate::archive::normalize::normalize;
-use crate::storage::traits::CAS;
 use crate::storage::simple::SimpleStorage;
 use regex::Regex;
 use std::io::{Cursor, Read as _, Result};

@@ -8,7 +8,6 @@ use crate::archive::core::{
     Triad,
     TriadFormat,
 };
-use crate::storage::traits::*;
 use crate::storage::simple::SimpleStorage;
 use regex::Regex;
 use std::io::{Error, Result};
