@@ -8,9 +8,6 @@ rustPlatform.buildRustPackage rec {
   cargoLock.lockFile = ./Cargo.lock;
   src = lib.cleanSource ./.;
 
-  doCheck = false;
-
   buildInputs = with pkgs; [ openssl ];
-
   nativeBuildInputs = with pkgs; [ pkg-config ];
 }
