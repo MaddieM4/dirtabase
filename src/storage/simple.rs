@@ -32,9 +32,12 @@
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
-use crate::storage::core::*;
+use crate::digest::Digest;
+use crate::label::Label;
+use std::path::{Path, PathBuf};
+use std::io::{self,Write,Cursor};
+use std::io::ErrorKind::NotFound;
 use tempfile::NamedTempFile;
-use std::io::{Write,Cursor};
 use sha2::Digest as _;
 
 /// Implementation of the simple storage backend.
