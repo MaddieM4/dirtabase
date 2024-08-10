@@ -24,14 +24,14 @@ fn _err<T>(text: &'static str) -> Result<T> {
     Err(Error::other(text))
 }
 
-pub struct Context<'a> {
-    store: &'a SimpleStorage,
+pub struct Context<'a, P> where P: AsRef<std::path::Path> {
+    store: &'a SimpleStorage<P>,
     encoding: EncodingSettings,
     pub triads: Vec<Triad>,
 }
 
-impl<'a> Context<'a> {
-    pub fn new(store: &'a SimpleStorage, encoding: EncodingSettings) -> Self {
+impl<'a,P> Context<'a,P> where P: AsRef<std::path::Path> {
+    pub fn new(store: &'a SimpleStorage<P>, encoding: EncodingSettings) -> Self {
         Self {
             store: store,
             encoding: encoding,
@@ -39,7 +39,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn new_from(store: &'a SimpleStorage, triads: Vec<Triad>) -> Self {
+    pub fn new_from(store: &'a SimpleStorage<P>, triads: Vec<Triad>) -> Self {
         Self {
             store: store,
             encoding: DEFAULT_ENCODING,

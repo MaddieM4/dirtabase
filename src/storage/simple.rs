@@ -41,18 +41,17 @@ use tempfile::NamedTempFile;
 use sha2::Digest as _;
 
 /// Implementation of the simple storage backend.
-pub struct SimpleStorage(SimpleCAS, SimpleLabels);
-impl SimpleStorage {
-    pub fn cas(&self) -> &SimpleCAS { &self.0 }
-    pub fn labels(&self) -> &SimpleLabels { &self.1 }
+pub struct SimpleStorage<P>(P, SimpleCAS, SimpleLabels) where P: AsRef<Path>;
+impl<P> SimpleStorage<P> where P: AsRef<Path> {
+    pub fn cas(&self) -> &SimpleCAS { &self.1 }
+    pub fn labels(&self) -> &SimpleLabels { &self.2 }
 }
 
 /// Create a simple storage backend.
-pub fn storage(path: impl AsRef<Path>) -> io::Result<SimpleStorage> {
-    let buf: PathBuf = path.as_ref().into();
-    let cas = SimpleCAS::new(&buf.join("cas"))?;
-    let labels = SimpleLabels::new(&buf.join("labels"))?;
-    Ok(SimpleStorage(cas, labels))
+pub fn storage<P>(p: P) -> io::Result<SimpleStorage<P>> where P: AsRef<Path> {
+    let cas = SimpleCAS::new(p.as_ref().join("cas"))?;
+    let labels = SimpleLabels::new(p.as_ref().join("labels"))?;
+    Ok(SimpleStorage(p, cas, labels))
 }
 
 /// Content-addressed storage in the Simple DB format.

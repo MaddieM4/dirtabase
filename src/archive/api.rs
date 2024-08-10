@@ -14,12 +14,15 @@ pub fn archive_decode(bytes: Vec<u8>, _f: ArchiveFormat, _c: Compression) -> Res
     serde_json::from_slice(bytes.as_ref()).map_err(|e| std::io::Error::other(e))
 }
 
-pub fn write_archive(
+pub fn write_archive<P>(
     ar: &Archive,
     f: ArchiveFormat,
     c: Compression,
-    store: &SimpleStorage,
-) -> Result<Digest> {
+    store: &SimpleStorage<P>,
+) -> Result<Digest>
+where
+    P: AsRef<std::path::Path>,
+{
     // Turn `ar` into `bytes: Vec<u8>`
     let bytes = archive_encode(ar, f, c)?;
 
@@ -30,12 +33,15 @@ pub fn write_archive(
     store.cas().write(curs)
 }
 
-pub fn read_archive(
+pub fn read_archive<P>(
     f: ArchiveFormat,
     c: Compression,
     digest: &Digest,
-    store: &SimpleStorage,
-) -> Result<Archive> {
+    store: &SimpleStorage<P>,
+) -> Result<Archive>
+where
+    P: AsRef<std::path::Path>,
+{
     let mut bytes: Vec<u8> = vec![];
     store
         .cas()
@@ -70,7 +76,8 @@ pub fn replace(ar: Archive, re: &Regex, replacement: &str) -> Archive {
         let haystack = p.to_str().expect("Could not convert path to str");
         String::from(re.replace(haystack, replacement)).into()
     }
-    let replaced = ar.into_iter()
+    let replaced = ar
+        .into_iter()
         .map(|entry| match entry {
             Entry::Dir { path, attrs } => Entry::Dir {
                 path: replace_path(path, re, replacement),

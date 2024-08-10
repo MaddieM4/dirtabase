@@ -1,6 +1,6 @@
 pub mod ctx;
-use crate::op::ctx::Context;
 use crate::archive::core::Triad;
+use crate::op::ctx::Context;
 use crate::storage::simple::SimpleStorage;
 use std::io::Result;
 
@@ -18,12 +18,15 @@ pub enum Op {
     CmdImpure,
 }
 
-pub fn perform(
+pub fn perform<P>(
     op: Op,
-    store: &SimpleStorage,
+    store: &SimpleStorage<P>,
     triads: Vec<Triad>,
     params: Vec<String>,
-) -> Result<Vec<Triad>> {
+) -> Result<Vec<Triad>>
+where
+    P: AsRef<std::path::Path>,
+{
     match op {
         Op::Empty => Ok(Context::new_from(store, triads).empty()?.triads),
         Op::Import => Ok(Context::new_from(store, triads).import(params)?.triads),

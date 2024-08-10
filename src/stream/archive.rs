@@ -41,7 +41,10 @@ use std::io::{Cursor, Error, ErrorKind, Read, Result};
 /// This requires already having a store. It will save files into the store as
 /// you submit them. The Archive itself is serialized and saved to store at the
 /// end, which is the Triad returned by .finalize().
-pub fn sink<'a>(store: &'a SimpleStorage) -> ArchiveSink<'a> {
+pub fn sink<'a, P>(store: &'a SimpleStorage<P>) -> ArchiveSink<'a, P>
+where
+    P: AsRef<std::path::Path>,
+{
     ArchiveSink {
         store: store,
         archive: vec![],
@@ -51,14 +54,20 @@ pub fn sink<'a>(store: &'a SimpleStorage) -> ArchiveSink<'a> {
 }
 
 /// Implementation of sink(&store).
-pub struct ArchiveSink<'a> {
-    store: &'a SimpleStorage,
+pub struct ArchiveSink<'a, P>
+where
+    P: AsRef<std::path::Path>,
+{
+    store: &'a SimpleStorage<P>,
     archive: Archive,
     format: ArchiveFormat,
     compression: Compression,
 }
 
-impl Sink for ArchiveSink<'_> {
+impl<P> Sink for ArchiveSink<'_, P>
+where
+    P: AsRef<std::path::Path>,
+{
     type Receipt = Triad;
 
     fn send_dir(mut self, path: impl AsRef<Path>, attrs: Attrs) -> Result<Self> {
@@ -98,9 +107,10 @@ impl Sink for ArchiveSink<'_> {
 /// This requires you to have a store, but also a Triad to say which archive
 /// within that store you want to read. Because of the Stream API this works
 /// by driving some kind of Sink.
-pub fn source<S>(store: &SimpleStorage, triad: Triad, mut sink: S) -> Result<S::Receipt>
+pub fn source<S, P>(store: &SimpleStorage<P>, triad: Triad, mut sink: S) -> Result<S::Receipt>
 where
     S: Sink,
+    P: AsRef<std::path::Path>,
 {
     let (f, c, d) = (triad.0, triad.1, triad.2);
     let f = match f {
@@ -148,8 +158,8 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use tempfile::tempdir;
     use indoc::indoc;
+    use tempfile::tempdir;
 
     #[test]
     fn round_trip() -> Result<()> {
@@ -162,13 +172,16 @@ mod test {
         let triad = debug::source(arc_sink)?;
 
         let txt = source(&store, triad, debug::sink())?;
-        assert_eq!(txt, indoc!{"
+        assert_eq!(
+            txt,
+            indoc! {"
           FILE /some/dir/hello.txt
             Length: 17
             AnotherAttr: for example purposes
           DIR /a/directory
             Foo: Bar
-        "});
+        "}
+        );
 
         Ok(())
     }
