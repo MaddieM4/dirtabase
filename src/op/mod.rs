@@ -44,14 +44,12 @@ mod test {
     use super::*;
     use crate::archive::core::{Attrs, Compression, TriadFormat};
     use crate::digest::Digest;
-    use crate::storage::simple::storage;
+    use crate::storage;
     use crate::stream::core::Sink;
     use indoc::indoc;
-    use tempfile::tempdir;
 
     fn fixture_triad() -> Result<Triad> {
-        let dir = tempdir()?;
-        let store = storage(dir.path())?;
+        let store = storage::new_from_tempdir()?;
         let sink = crate::stream::archive::sink(&store);
 
         sink.send_file(
@@ -80,8 +78,7 @@ mod test {
     #[test]
     fn import() -> Result<()> {
         let op = Op::Import;
-        let dir = tempdir()?;
-        let store = storage(dir.path())?;
+        let store = storage::new_from_tempdir()?;
         let t1 = Triad(TriadFormat::File, Compression::Plain, Digest::from("foo"));
         let t2 = Triad(TriadFormat::File, Compression::Plain, Digest::from("bar"));
         let t3 = fixture_triad()?;
@@ -98,12 +95,11 @@ mod test {
     #[test]
     fn export() -> Result<()> {
         let op = Op::Export;
-        let dir = tempdir()?;
-        let store = storage(dir.path())?;
+        let store = storage::new_from_tempdir()?;
         let mut imported = perform(Op::Import, &store, vec![], vec!["./fixture".into()])?;
         let t: Triad = imported.pop().unwrap();
 
-        let output_dir = tempdir()?;
+        let output_dir = tempfile::tempdir()?;
         assert_eq!(
             perform(op, &store, vec![t], vec![path_str(&output_dir)])?,
             vec![]
@@ -114,8 +110,7 @@ mod test {
 
     #[test]
     fn merge() -> Result<()> {
-        let store_dir = tempdir()?;
-        let store = storage(store_dir.path())?;
+        let store = storage::new_from_tempdir()?;
         use crate::stream::archive::sink;
 
         let triad_dbg = crate::stream::debug::source(sink(&store))?;
@@ -145,9 +140,8 @@ mod test {
 
     #[test]
     fn filter() -> Result<()> {
-        let out = tempdir()?;
-        let store_dir = tempdir()?;
-        let store = storage(store_dir.path())?;
+        let out = tempfile::tempdir()?;
+        let store = storage::new_from_tempdir()?;
         let imported = perform(Op::Import, &store, vec![], vec!["./fixture".into()])?;
         let filtered = perform(Op::Filter, &store, imported, vec!["dir2".into()])?;
         let exported = perform(Op::Export, &store, filtered, vec![path_str(&out)])?;
@@ -161,8 +155,7 @@ mod test {
 
     #[test]
     fn replace() -> Result<()> {
-        let store_dir = tempdir()?;
-        let store = storage(store_dir.path())?;
+        let store = storage::new_from_tempdir()?;
         use crate::stream::archive::sink;
 
         let triad_dbg = crate::stream::debug::source(sink(&store))?;
@@ -196,8 +189,7 @@ mod test {
 
     #[test]
     fn prefix() -> Result<()> {
-        let store_dir = tempdir()?;
-        let store = storage(store_dir.path())?;
+        let store = storage::new_from_tempdir()?;
         use crate::stream::archive::sink;
 
         let triad_dbg = crate::stream::debug::source(sink(&store))?;

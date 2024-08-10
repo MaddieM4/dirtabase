@@ -3,11 +3,10 @@
 //! ```
 //! use indoc::indoc;
 //! use tempfile::tempdir;
-//! use dirtabase::storage::simple::storage;
+//! use dirtabase::storage;
 //! use dirtabase::stream::{debug,archive};
 //!
-//! let dir = tempdir()?;
-//! let store = storage(&dir)?;
+//! let store = storage::new_from_tempdir()?;
 //!
 //! // The triad is a reference to where an archive was stored within a store
 //! let triad = debug::source(archive::sink(&store))?;
@@ -159,15 +158,13 @@ where
 mod test {
     use super::*;
     use indoc::indoc;
-    use tempfile::tempdir;
 
     #[test]
     fn round_trip() -> Result<()> {
-        use crate::storage::simple::storage;
+        use crate::storage;
         use crate::stream::debug;
 
-        let dir = tempdir()?;
-        let store = storage(&dir)?;
+        let store = storage::new_from_tempdir()?;
         let arc_sink = sink(&store);
         let triad = debug::source(arc_sink)?;
 

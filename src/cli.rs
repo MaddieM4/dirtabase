@@ -100,7 +100,7 @@ pub fn execute(behavior: Behavior, stdout: &mut impl Write) -> ExitCode {
 }
 
 fn execute_pipeline(steps: Vec<PipelineStep>, stdout: &mut impl Write) -> std::io::Result<()> {
-    let store = crate::storage::simple::storage("./.dirtabase_db")?;
+    let store = crate::storage::new("./.dirtabase_db")?;
     let mut triads: Vec<Triad> = vec![];
     for step in steps {
         let (op, params) = (step.0, step.1);

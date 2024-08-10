@@ -20,12 +20,10 @@
 //! without thinking about too many distant moving parts.
 //!
 //! ```
-//! use tempfile::tempdir;
 //! use dirtabase::digest::Digest;
-//! use dirtabase::storage::simple;
+//! use dirtabase::storage;
 //!
-//! let dir = tempdir()?;
-//! let store = simple::storage(&dir)?;
+//! let store = storage::new_from_tempdir()?;
 //! let digest = store.cas().write_buf("foo")?;
 //!
 //! assert_eq!(digest.to_hex(), Digest::from("foo").to_hex());
@@ -43,15 +41,15 @@ use sha2::Digest as _;
 /// Implementation of the simple storage backend.
 pub struct SimpleStorage<P>(P, SimpleCAS, SimpleLabels) where P: AsRef<Path>;
 impl<P> SimpleStorage<P> where P: AsRef<Path> {
+    /// Create a simple storage backend.
+    pub fn new(path: P) -> io::Result<Self> {
+        let cas = SimpleCAS::new(path.as_ref().join("cas"))?;
+        let labels = SimpleLabels::new(path.as_ref().join("labels"))?;
+        Ok(Self(path, cas, labels))
+    }
+
     pub fn cas(&self) -> &SimpleCAS { &self.1 }
     pub fn labels(&self) -> &SimpleLabels { &self.2 }
-}
-
-/// Create a simple storage backend.
-pub fn storage<P>(p: P) -> io::Result<SimpleStorage<P>> where P: AsRef<Path> {
-    let cas = SimpleCAS::new(p.as_ref().join("cas"))?;
-    let labels = SimpleLabels::new(p.as_ref().join("labels"))?;
-    Ok(SimpleStorage(p, cas, labels))
 }
 
 /// Content-addressed storage in the Simple DB format.
@@ -150,7 +148,7 @@ mod test {
     #[test]
     fn cas_read() -> io::Result<()> {
         let dir = tempdir()?;
-        let store = storage(&dir)?;
+        let store = SimpleStorage::new(&dir)?;
         let d: Digest = "some text".into();
         let path = dir.path().join("cas").join(d.to_hex());
 
@@ -169,7 +167,7 @@ mod test {
     #[test]
     fn cas_write() -> io::Result<()> {
         let dir = tempdir()?;
-        let store = storage(&dir)?;
+        let store = SimpleStorage::new(&dir)?;
         let contents = "some text";
         let d: Digest = contents.into();
         let path = dir.path().join("cas").join(d.to_hex());
@@ -190,7 +188,7 @@ mod test {
     #[test]
     fn lab_read() -> io::Result<()> {
         let dir = tempdir()?;
-        let store = storage(&dir)?;
+        let store = SimpleStorage::new(&dir)?;
         let lab = Label::new("@foo").unwrap();
         let path = dir.path().join("labels/@foo");
 
@@ -207,7 +205,7 @@ mod test {
     #[test]
     fn lab_write() -> io::Result<()> {
         let dir = tempdir()?;
-        let store = storage(&dir)?;
+        let store = SimpleStorage::new(&dir)?;
         let lab = Label::new("@foo").unwrap();
         let path = dir.path().join("labels/@foo");
 

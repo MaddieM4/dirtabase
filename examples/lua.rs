@@ -1,9 +1,7 @@
 use dirtabase::archive::core::Triad;
 use dirtabase::op::ctx::{Context, DEFAULT_ENCODING};
-use dirtabase::storage::simple::storage;
-
+use dirtabase::storage;
 use std::io::Result;
-use tempfile::tempdir;
 
 fn build_lua_5_4_7<P>(ctx: Context<P>) -> Result<Triad> where P: AsRef<std::path::Path> {
     ctx.download(vec![
@@ -20,8 +18,7 @@ fn build_lua_5_4_7<P>(ctx: Context<P>) -> Result<Triad> where P: AsRef<std::path
 }
 
 fn main() -> Result<()> {
-    let store_dir = tempdir()?;
-    let store = storage(store_dir.path())?;
+    let store = storage::new_from_tempdir()?;
     let ctx = Context::new(&store, DEFAULT_ENCODING);
     let triad = build_lua_5_4_7(ctx)?;
 
