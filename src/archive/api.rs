@@ -1,6 +1,7 @@
 use crate::archive::core::*;
 use crate::archive::normalize::normalize;
-use crate::storage::traits::{Storage, CAS};
+use crate::storage::traits::CAS;
+use crate::storage::simple::SimpleStorage;
 use regex::Regex;
 use std::io::{Cursor, Read as _, Result};
 
@@ -18,7 +19,7 @@ pub fn write_archive(
     ar: &Archive,
     f: ArchiveFormat,
     c: Compression,
-    store: &impl Storage,
+    store: &SimpleStorage,
 ) -> Result<Digest> {
     // Turn `ar` into `bytes: Vec<u8>`
     let bytes = archive_encode(ar, f, c)?;
@@ -34,7 +35,7 @@ pub fn read_archive(
     f: ArchiveFormat,
     c: Compression,
     digest: &Digest,
-    store: &impl Storage,
+    store: &SimpleStorage,
 ) -> Result<Archive> {
     let mut bytes: Vec<u8> = vec![];
     store

@@ -1,7 +1,7 @@
 pub mod ctx;
 use crate::op::ctx::Context;
 use crate::archive::core::Triad;
-use crate::storage::traits::*;
+use crate::storage::simple::SimpleStorage;
 use std::io::Result;
 
 // TODO: Multi-backend interaction
@@ -20,7 +20,7 @@ pub enum Op {
 
 pub fn perform(
     op: Op,
-    store: &impl Storage,
+    store: &SimpleStorage,
     triads: Vec<Triad>,
     params: Vec<String>,
 ) -> Result<Vec<Triad>> {

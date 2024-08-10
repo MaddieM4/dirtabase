@@ -9,6 +9,7 @@ use crate::archive::core::{
     TriadFormat,
 };
 use crate::storage::traits::*;
+use crate::storage::simple::SimpleStorage;
 use regex::Regex;
 use std::io::{Error, Result};
 use std::process::Command;
@@ -24,20 +25,14 @@ fn _err<T>(text: &'static str) -> Result<T> {
     Err(Error::other(text))
 }
 
-pub struct Context<'a, S>
-where
-    S: Storage,
-{
-    store: &'a S,
+pub struct Context<'a> {
+    store: &'a SimpleStorage,
     encoding: EncodingSettings,
     pub triads: Vec<Triad>,
 }
 
-impl<'a, S> Context<'a, S>
-where
-    S: Storage,
-{
-    pub fn new(store: &'a S, encoding: EncodingSettings) -> Self {
+impl<'a> Context<'a> {
+    pub fn new(store: &'a SimpleStorage, encoding: EncodingSettings) -> Self {
         Self {
             store: store,
             encoding: encoding,
@@ -45,7 +40,7 @@ where
         }
     }
 
-    pub fn new_from(store: &'a S, triads: Vec<Triad>) -> Self {
+    pub fn new_from(store: &'a SimpleStorage, triads: Vec<Triad>) -> Self {
         Self {
             store: store,
             encoding: DEFAULT_ENCODING,

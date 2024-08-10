@@ -40,6 +40,10 @@ use sha2::Digest as _;
 
 /// Implementation of the simple storage backend.
 pub struct SimpleStorage(SimpleCAS, SimpleLabels);
+impl SimpleStorage {
+    pub fn cas(&self) -> &SimpleCAS { &self.0 }
+    pub fn labels(&self) -> &SimpleLabels { &self.1 }
+}
 
 /// Create a simple storage backend.
 pub fn storage(path: impl AsRef<Path>) -> io::Result<SimpleStorage> {
@@ -47,13 +51,6 @@ pub fn storage(path: impl AsRef<Path>) -> io::Result<SimpleStorage> {
     let cas = SimpleCAS::new(&buf.join("cas"))?;
     let labels = SimpleLabels::new(&buf.join("labels"))?;
     Ok(SimpleStorage(cas, labels))
-}
-
-impl Storage for SimpleStorage {
-    type C = SimpleCAS;
-    type L = SimpleLabels;
-    fn cas(&self) -> &Self::C{ &self.0 }
-    fn labels(&self) -> &Self::L{ &self.1 }
 }
 
 /// Content-addressed storage in the Simple DB format.

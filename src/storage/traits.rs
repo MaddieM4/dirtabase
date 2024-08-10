@@ -21,14 +21,6 @@ use crate::digest::Digest;
 use crate::label::Label;
 use std::io::{Read,Result,Cursor};
 
-/// Entrypoint to the Storage API.
-pub trait Storage {
-    type C: CAS;
-    type L: Labels;
-    fn cas(&self) -> &Self::C;
-    fn labels(&self) -> &Self::L;
-}
-
 /// Content-addressed storage interface.
 pub trait CAS {
     type Reader: Read;

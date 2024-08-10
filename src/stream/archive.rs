@@ -33,6 +33,7 @@
 use crate::archive::api::*;
 use crate::archive::core::*;
 use crate::storage::traits::*;
+use crate::storage::simple::SimpleStorage;
 use crate::stream::core::Sink;
 use std::io::{Cursor, Error, ErrorKind, Read, Result};
 
@@ -41,10 +42,7 @@ use std::io::{Cursor, Error, ErrorKind, Read, Result};
 /// This requires already having a store. It will save files into the store as
 /// you submit them. The Archive itself is serialized and saved to store at the
 /// end, which is the Triad returned by .finalize().
-pub fn sink<'a, S>(store: &'a S) -> ArchiveSink<'a, S>
-where
-    S: Storage,
-{
+pub fn sink<'a>(store: &'a SimpleStorage) -> ArchiveSink<'a> {
     ArchiveSink {
         store: store,
         archive: vec![],
@@ -54,20 +52,14 @@ where
 }
 
 /// Implementation of sink(&store).
-pub struct ArchiveSink<'a, S>
-where
-    S: Storage,
-{
-    store: &'a S,
+pub struct ArchiveSink<'a> {
+    store: &'a SimpleStorage,
     archive: Archive,
     format: ArchiveFormat,
     compression: Compression,
 }
 
-impl<S> Sink for ArchiveSink<'_, S>
-where
-    S: Storage,
-{
+impl Sink for ArchiveSink<'_> {
     type Receipt = Triad;
 
     fn send_dir(mut self, path: impl AsRef<Path>, attrs: Attrs) -> Result<Self> {
@@ -107,7 +99,7 @@ where
 /// This requires you to have a store, but also a Triad to say which archive
 /// within that store you want to read. Because of the Stream API this works
 /// by driving some kind of Sink.
-pub fn source<S>(store: &impl Storage, triad: Triad, mut sink: S) -> Result<S::Receipt>
+pub fn source<S>(store: &SimpleStorage, triad: Triad, mut sink: S) -> Result<S::Receipt>
 where
     S: Sink,
 {
