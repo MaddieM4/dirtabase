@@ -189,7 +189,7 @@ mod test {
         ]), &mut stdout);
         assert_eq!(String::from_utf8(stdout).unwrap(), indoc! {"
             --- Import ---
-            json-plain-d6467585a5b63a42945759efd8c8a21dfd701470253339477407653e48a3643a
+            json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4
         "});
     }
 
@@ -203,7 +203,7 @@ mod test {
         ]), &mut stdout);
         assert_eq!(String::from_utf8(stdout).unwrap(), indoc! {"
             --- Import ---
-            json-plain-d6467585a5b63a42945759efd8c8a21dfd701470253339477407653e48a3643a
+            json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4
             --- Export ---
         "});
         assert!(dir.path().join("dir1/dir2/nested.txt").exists());

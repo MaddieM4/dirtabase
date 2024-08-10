@@ -15,12 +15,16 @@
 //!
 //! // We just stored our standard example archive into the store, then
 //! // pulled it back out in text summary form. Neat!
+//! //
+//! // Note that files come before directories because the Archive Sink
+//! // normalizes archives, so this isn't the same order as you'd see from
+//! // the Debug Source directly.
 //! assert_eq!(&txt, indoc! {"
-//!   DIR /a/directory
-//!     Foo: Bar
 //!   FILE /some/dir/hello.txt
 //!     Length: 17
 //!     AnotherAttr: for example purposes
+//!   DIR /a/directory
+//!     Foo: Bar
 //! "});
 //!
 //! # Ok::<(), std::io::Error>(())
@@ -86,7 +90,8 @@ where
     }
 
     fn finalize(self) -> Result<Triad> {
-        let bytes = archive_encode(&self.archive, self.format, self.compression)?;
+        let ar = crate::archive::normalize::normalize(&self.archive);
+        let bytes = archive_encode(&ar, self.format, self.compression)?;
         let digest = self.store.cas().write(Cursor::new(bytes))?;
         // dbg!(self.archive);
         Ok(Triad(
@@ -153,6 +158,7 @@ where
 mod test {
     use super::*;
     use tempfile::tempdir;
+    use indoc::indoc;
 
     #[test]
     fn round_trip() -> Result<()> {
@@ -165,7 +171,13 @@ mod test {
         let triad = debug::source(arc_sink)?;
 
         let txt = source(&store, triad, debug::sink())?;
-        assert_eq!(txt, debug::source(debug::sink())?);
+        assert_eq!(txt, indoc!{"
+          FILE /some/dir/hello.txt
+            Length: 17
+            AnotherAttr: for example purposes
+          DIR /a/directory
+            Foo: Bar
+        "});
 
         Ok(())
     }
