@@ -71,6 +71,20 @@ At each step, the interface is a stream of digests or other references
 passing from one stage of processing to the next. That's the input and
 output stream format of `dirtabase` Operators.
 
+# Contributing
+
+This repo is equipped to use [devenv.sh](https://devenv.sh/), which is [pretty
+easy](https://devenv.sh/getting-started/#installation) to get set up. It also
+integrates nicely with [direnv](https://devenv.sh/automatic-shell-activation/). 
+
+```bash
+# These commands should work after setup!
+direnv test
+direnv shell
+```
+
+I'm going to also set up building this as a Nix package/flake later.
+
 ## URL format
 
 ```
