@@ -1,5 +1,10 @@
 pub mod ctx;
+pub mod helpers;
 pub mod ops;
+
+#[cfg(test)]
+mod test_helpers;
+
 use crate::archive::core::Triad;
 use crate::op::ctx::Context;
 use crate::storage::simple::SimpleStorage;

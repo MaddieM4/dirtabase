@@ -3,8 +3,8 @@ use super::prelude::*;
 #[derive(Debug, PartialEq)]
 pub struct Import(pub Vec<String>);
 
-impl Import {
-    pub fn from_args<T>(args: impl IntoIterator<Item = T>) -> Result<Self>
+impl Operation for Import {
+    fn from_args<T>(args: impl IntoIterator<Item = T>) -> Result<Self>
     where
         T: AsRef<str>,
     {
@@ -13,7 +13,7 @@ impl Import {
         ))
     }
 
-    pub fn transform<P>(&self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(&self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
     where
         P: AsRef<Path>,
     {
@@ -28,6 +28,7 @@ impl Import {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::op::test_helpers::*;
 
     #[test]
     fn from_args() -> Result<()> {
