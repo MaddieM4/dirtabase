@@ -11,9 +11,13 @@ pub enum ArchiveFormat {
 }
 impl std::fmt::Display for ArchiveFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Self::JSON => "json",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::JSON => "json",
+            }
+        )
     }
 }
 
@@ -24,14 +28,18 @@ pub enum Compression {
 }
 impl std::fmt::Display for Compression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Self::Plain => "plain",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Plain => "plain",
+            }
+        )
     }
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-#[serde(tag="t", content="c", rename_all="lowercase")]
+#[serde(tag = "t", content = "c", rename_all = "lowercase")]
 pub enum Entry {
     Dir {
         path: PathBuf,
@@ -61,10 +69,14 @@ pub enum TriadFormat {
 }
 impl std::fmt::Display for TriadFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Self::File => "file".to_owned(),
-            Self::Archive(af) => af.to_string(),
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::File => "file".to_owned(),
+                Self::Archive(af) => af.to_string(),
+            }
+        )
     }
 }
 
@@ -89,6 +101,17 @@ mod test {
             txt,
             r#"["file","plain","2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"]"#
         );
+
+        let triad = Triad(
+            TriadFormat::Archive(ArchiveFormat::JSON),
+            Compression::Plain,
+            Digest::from("bar"),
+        );
+        let txt = to_string(&triad).expect("Serialized without errors");
+        assert_eq!(
+            txt,
+            r#"[{"archive":"json"},"plain","fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9"]"#
+        );
     }
 
     #[test]
@@ -99,13 +122,34 @@ mod test {
             triad,
             Triad(TriadFormat::File, Compression::Plain, Digest::from("foo"))
         );
+
+        let txt = r#"[{"archive":"json"},"plain","fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9"]"#;
+        let triad: Triad = from_str(&txt).expect("Deserialized without errors");
+        assert_eq!(
+            triad,
+            Triad(
+                TriadFormat::Archive(ArchiveFormat::JSON),
+                Compression::Plain,
+                Digest::from("bar")
+            )
+        );
     }
 
     #[test]
     fn triad_display() {
         let triad = Triad(TriadFormat::File, Compression::Plain, Digest::from("foo"));
-        assert_eq!(triad.to_string(), "file-plain-2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae");
-        let triad = Triad(TriadFormat::Archive(ArchiveFormat::JSON), Compression::Plain, Digest::from("foo"));
-        assert_eq!(triad.to_string(), "json-plain-2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae");
+        assert_eq!(
+            triad.to_string(),
+            "file-plain-2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+        );
+        let triad = Triad(
+            TriadFormat::Archive(ArchiveFormat::JSON),
+            Compression::Plain,
+            Digest::from("foo"),
+        );
+        assert_eq!(
+            triad.to_string(),
+            "json-plain-2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+        );
     }
 }

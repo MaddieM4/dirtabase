@@ -32,15 +32,20 @@
 
 use crate::digest::Digest;
 use crate::label::Label;
-use std::path::{Path, PathBuf};
-use std::io::{self,Write,Cursor};
-use std::io::ErrorKind::NotFound;
-use tempfile::NamedTempFile;
 use sha2::Digest as _;
+use std::io::ErrorKind::NotFound;
+use std::io::{self, Cursor, Write};
+use std::path::{Path, PathBuf};
+use tempfile::NamedTempFile;
 
 /// Implementation of the simple storage backend.
-pub struct SimpleStorage<P>(P, SimpleCAS, SimpleLabels) where P: AsRef<Path>;
-impl<P> SimpleStorage<P> where P: AsRef<Path> {
+pub struct SimpleStorage<P>(P, SimpleCAS, SimpleLabels)
+where
+    P: AsRef<Path>;
+impl<P> SimpleStorage<P>
+where
+    P: AsRef<Path>,
+{
     /// Create a simple storage backend.
     pub fn new(path: P) -> io::Result<Self> {
         let cas = SimpleCAS::new(path.as_ref().join("cas"))?;
@@ -48,8 +53,12 @@ impl<P> SimpleStorage<P> where P: AsRef<Path> {
         Ok(Self(path, cas, labels))
     }
 
-    pub fn cas(&self) -> &SimpleCAS { &self.1 }
-    pub fn labels(&self) -> &SimpleLabels { &self.2 }
+    pub fn cas(&self) -> &SimpleCAS {
+        &self.1
+    }
+    pub fn labels(&self) -> &SimpleLabels {
+        &self.2
+    }
 }
 
 /// Content-addressed storage in the Simple DB format.
@@ -63,12 +72,13 @@ impl SimpleCAS {
 
     /// Get the contents of a resource within the store.
     pub fn read(&self, digest: &Digest) -> io::Result<Option<std::fs::File>> {
-        let path = self.0.join(digest.to_hex()); match std::fs::File::open(path) {
+        let path = self.0.join(digest.to_hex());
+        match std::fs::File::open(path) {
             Ok(f) => Ok(Some(f)),
             Err(e) => match e.kind() {
                 NotFound => Ok(None),
-                _ => Err(e)
-            }
+                _ => Err(e),
+            },
         }
     }
 
@@ -81,7 +91,7 @@ impl SimpleCAS {
         loop {
             let n = reader.read(&mut buf)?;
             if n == 0 {
-                break
+                break;
             }
             let bytes = &buf[..n];
             hash.update(bytes);
@@ -123,7 +133,7 @@ impl SimpleLabels {
             Err(e) => match e.kind() {
                 NotFound => Ok(vec![]),
                 _ => Err(e),
-            }
+            },
         }
     }
 
@@ -142,8 +152,8 @@ impl SimpleLabels {
 #[cfg(test)]
 mod test {
     use super::*;
-    use tempfile::tempdir;
     use std::io::Read;
+    use tempfile::tempdir;
 
     #[test]
     fn cas_read() -> io::Result<()> {
@@ -158,7 +168,11 @@ mod test {
         // Artificially inject file
         std::fs::write(path, b"blah blah blah")?;
         let mut buf: Vec<u8> = vec![];
-        store.cas().read(&d)?.expect("file exists now").read_to_end(&mut buf)?;
+        store
+            .cas()
+            .read(&d)?
+            .expect("file exists now")
+            .read_to_end(&mut buf)?;
         assert_eq!(buf, b"blah blah blah");
 
         Ok(())
@@ -193,7 +207,7 @@ mod test {
         let path = dir.path().join("labels/@foo");
 
         // No label file but not an error, represented as empty array
-        assert_eq!(store.labels().read(&lab)?, vec![0;0]);
+        assert_eq!(store.labels().read(&lab)?, vec![0; 0]);
 
         // Artificially inject some contents
         std::fs::write(path, b"Some bytes")?;
@@ -218,5 +232,4 @@ mod test {
 
         Ok(())
     }
-
 }

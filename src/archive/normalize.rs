@@ -1,9 +1,9 @@
 //! Archive normalization logic.
 
 use crate::archive::core::*;
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::cmp::Reverse;
 
 /// Simplify an Archive without changing how it would convert to a tree.
 ///
@@ -21,7 +21,7 @@ use std::cmp::Reverse;
 ///  * Directories must be sorted from most to least nested
 ///      (imagine trying to give a/b/c to root after ceding a/b to root!)
 ///
-///  See https://github.com/MaddieM4/dirtabase/issues/6 for more details.
+///  See <https://github.com/MaddieM4/dirtabase/issues/6> for more details.
 pub fn normalize(ar: &Archive) -> Archive {
     let mut overrides_applied: Vec<(PathBuf, Entry)> = ar
         .iter()
@@ -38,16 +38,18 @@ pub fn normalize(ar: &Archive) -> Archive {
         .collect();
 
     // Sort that handles partitioning and directory nesting at the same time
-    overrides_applied.sort_by_key(|(p, e)| (
-        // Sort primarily by file-ness
-        match e {
-            Entry::File { .. } => 0,
-            Entry::Dir { .. } => 1,
-        },
-        // Secondarily by path in reverse order
-        Reverse(p.clone()),
-    ));
-    overrides_applied.into_iter().map(|(_,e)| e).collect()
+    overrides_applied.sort_by_key(|(p, e)| {
+        (
+            // Sort primarily by file-ness
+            match e {
+                Entry::File { .. } => 0,
+                Entry::Dir { .. } => 1,
+            },
+            // Secondarily by path in reverse order
+            Reverse(p.clone()),
+        )
+    });
+    overrides_applied.into_iter().map(|(_, e)| e).collect()
 }
 
 #[cfg(test)]

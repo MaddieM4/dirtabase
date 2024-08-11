@@ -1,9 +1,10 @@
-#![allow(dead_code,unused_imports)]
+#![allow(dead_code, unused_imports)]
 
 mod archive;
 mod attr;
 mod cli;
 mod digest;
+mod enc;
 mod label;
 mod op;
 mod storage;

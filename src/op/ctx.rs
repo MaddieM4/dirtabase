@@ -1,37 +1,29 @@
-use crate::archive::core::{
-    Archive,
-    ArchiveFormat,
-    Attrs,
-    Compression,
-    Digest,
-    Entry,
-    Triad,
-    TriadFormat,
-};
+use crate::archive::core::{Archive, Attrs, Compression, Digest, Entry, Triad, TriadFormat};
+use crate::enc::Settings as Enc;
 use crate::storage::simple::SimpleStorage;
 use regex::Regex;
 use std::io::{Error, Result};
 use std::process::Command;
 use tempfile::tempdir;
 
-#[derive(Copy, Clone)]
-pub struct EncodingSettings(ArchiveFormat, Compression);
-
-pub const DEFAULT_ENCODING: EncodingSettings =
-    EncodingSettings(ArchiveFormat::JSON, Compression::Plain);
-
 fn _err<T>(text: &'static str) -> Result<T> {
     Err(Error::other(text))
 }
 
-pub struct Context<'a, P> where P: AsRef<std::path::Path> {
+pub struct Context<'a, P>
+where
+    P: AsRef<std::path::Path>,
+{
     store: &'a SimpleStorage<P>,
-    encoding: EncodingSettings,
+    encoding: Enc,
     pub triads: Vec<Triad>,
 }
 
-impl<'a,P> Context<'a,P> where P: AsRef<std::path::Path> {
-    pub fn new(store: &'a SimpleStorage<P>, encoding: EncodingSettings) -> Self {
+impl<'a, P> Context<'a, P>
+where
+    P: AsRef<std::path::Path>,
+{
+    pub fn new(store: &'a SimpleStorage<P>, encoding: Enc) -> Self {
         Self {
             store: store,
             encoding: encoding,
@@ -42,7 +34,7 @@ impl<'a,P> Context<'a,P> where P: AsRef<std::path::Path> {
     pub fn new_from(store: &'a SimpleStorage<P>, triads: Vec<Triad>) -> Self {
         Self {
             store: store,
-            encoding: DEFAULT_ENCODING,
+            encoding: Enc::default(),
             triads: triads,
         }
     }
@@ -57,7 +49,7 @@ impl<'a,P> Context<'a,P> where P: AsRef<std::path::Path> {
     }
 
     fn write(&self, ar: &Archive) -> Result<Triad> {
-        let (store, f, c) = (self.store, self.encoding.0, self.encoding.1);
+        let (store, f, c) = (self.store, self.encoding.f(), self.encoding.c());
         let digest = crate::archive::api::write_archive(ar, f, c, store)?;
         Ok(Triad(TriadFormat::Archive(f), c, digest))
     }
@@ -179,7 +171,11 @@ impl<'a,P> Context<'a,P> where P: AsRef<std::path::Path> {
             compression: Compression::Plain,
             digest: digest.clone(),
         }];
-        print!(">> Downloaded {}\n>> Digest: {}\n", given_url, digest.to_hex());
+        print!(
+            ">> Downloaded {}\n>> Digest: {}\n",
+            given_url,
+            digest.to_hex()
+        );
         self.triads.push(self.write(&ar)?);
         Ok(self)
     }
@@ -200,7 +196,10 @@ impl<'a,P> Context<'a,P> where P: AsRef<std::path::Path> {
         let response = reqwest::blocking::get(given_url).map_err(|e| Error::other(e))?;
         let digest = self.store.cas().write(response)?;
         if digest != expected_digest {
-            return Err(Error::other(format!("Expected digest {:?}, got {:?}", expected_digest, digest)))
+            return Err(Error::other(format!(
+                "Expected digest {:?}, got {:?}",
+                expected_digest, digest
+            )));
         }
         let ar = vec![Entry::File {
             path: ("/".to_owned() + filename).into(),
@@ -208,7 +207,11 @@ impl<'a,P> Context<'a,P> where P: AsRef<std::path::Path> {
             compression: Compression::Plain,
             digest: digest.clone(),
         }];
-        print!(">> Downloaded {}\n>> Digest: {}\n", given_url, digest.to_hex());
+        print!(
+            ">> Downloaded {}\n>> Digest: {}\n",
+            given_url,
+            digest.to_hex()
+        );
         self.triads.push(self.write(&ar)?);
         Ok(self)
     }

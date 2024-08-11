@@ -16,14 +16,17 @@
 
 use crate::attr::*;
 use crate::stream::core::Sink;
+use std::io::Cursor;
 use std::io::{Read, Result};
 use std::path::Path;
-use std::io::Cursor;
 
 /// Send a standard series of directories and files.
 ///
 /// Used for various tests (for example, this module's docs!)
-pub fn source<S>(s: S) -> Result<S::Receipt> where S: Sink {
+pub fn source<S>(s: S) -> Result<S::Receipt>
+where
+    S: Sink,
+{
     s.send_dir("/a/directory", Attrs::new().set("Foo", "Bar"))?
         .send_file(
             "/some/dir/hello.txt",

@@ -11,7 +11,7 @@ use crate::attr::*;
 use crate::stream::core::Sink;
 use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir_in,TempDir};
+use tempfile::{tempdir_in, TempDir};
 
 /// Read from a real directory and emit to the given sink.
 ///
@@ -30,7 +30,10 @@ use tempfile::{tempdir_in,TempDir};
 ///
 /// # Ok::<(), std::io::Error>(())
 /// ```
-pub fn source<S>(base: impl AsRef<Path>, sink: S) -> Result<S::Receipt> where S: Sink {
+pub fn source<S>(base: impl AsRef<Path>, sink: S) -> Result<S::Receipt>
+where
+    S: Sink,
+{
     visit(base.as_ref(), Path::new("/"), sink)?.finalize()
 }
 

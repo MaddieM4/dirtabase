@@ -40,7 +40,9 @@ impl Attr {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Attrs(Vec<Attr>);
 impl Attrs {
-    pub fn new() -> Self { Self(vec![]) }
+    pub fn new() -> Self {
+        Self(vec![])
+    }
 
     /// Append an Attr to the list.
     ///
@@ -127,7 +129,7 @@ mod test {
             .append("B", "2")
             .append("C", "3")
             .append("B", "4");
-        assert_eq!(at!{ A=>"1", B=>"2", C=>"3", B=>"4" }, attrs);
+        assert_eq!(at! { A=>"1", B=>"2", C=>"3", B=>"4" }, attrs);
     }
 
     #[test]
@@ -137,7 +139,10 @@ mod test {
             .append("SECOND", "2")
             .append("THIRD", "3")
             .delete("SECOND");
-        assert_eq!(attrs, Attrs::new().append("FIRST","1").append("THIRD","3"));
+        assert_eq!(
+            attrs,
+            Attrs::new().append("FIRST", "1").append("THIRD", "3")
+        );
     }
 
     #[test]
@@ -150,9 +155,9 @@ mod test {
         assert_eq!(
             attrs,
             Attrs::new()
-                .append("FIRST","(hehe, first!)")
+                .append("FIRST", "(hehe, first!)")
                 .append("SOMETHING_ELSE", "take up some more space")
                 .append("OVERWRITE_ME", "value you WILL see")
-            );
+        );
     }
 }

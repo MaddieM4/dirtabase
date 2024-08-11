@@ -1,4 +1,5 @@
 pub mod ctx;
+pub mod ops;
 use crate::archive::core::Triad;
 use crate::op::ctx::Context;
 use crate::storage::simple::SimpleStorage;

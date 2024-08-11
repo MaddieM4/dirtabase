@@ -1,8 +1,8 @@
+use crate::archive::core::Triad;
+use crate::op::{perform as perform_op, Op};
 use indoc::indoc;
 use std::io::Write;
 use std::process::ExitCode;
-use crate::archive::core::Triad;
-use crate::op::{Op,perform as perform_op};
 
 const USAGE: &'static str = indoc! {"
     usage: dirtabase [--help|--version|pipeline...]
@@ -37,11 +37,11 @@ const USAGE: &'static str = indoc! {"
      --cmd-impure 'echo \"some text\" > file.txt'
 "};
 
-#[derive(PartialEq,Debug)]
+#[derive(PartialEq, Debug)]
 pub struct PipelineStep(Op, Vec<String>);
 
 /// What we decide to do based on CLI arguments
-#[derive(PartialEq,Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Behavior {
     Help,
     Version,
@@ -49,7 +49,10 @@ pub enum Behavior {
     Pipeline(Vec<PipelineStep>),
 }
 
-pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
+pub fn parse<S>(args: impl Iterator<Item = S>) -> Behavior
+where
+    S: AsRef<str>,
+{
     let mut pipeline: Vec<PipelineStep> = vec![];
 
     for arg in args {
@@ -65,13 +68,15 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
             "--prefix" => pipeline.push(PipelineStep(Op::Prefix, vec![])),
             "--cmd-impure" => pipeline.push(PipelineStep(Op::CmdImpure, vec![])),
 
-            other => if pipeline.is_empty() {
-                return Behavior::UnexpectedArg(other.to_owned())
-            } else {
-                let index = pipeline.len() - 1;
-                let current_pipeline = &mut pipeline[index];
-                current_pipeline.1.push(other.to_owned())
-            },
+            other => {
+                if pipeline.is_empty() {
+                    return Behavior::UnexpectedArg(other.to_owned());
+                } else {
+                    let index = pipeline.len() - 1;
+                    let current_pipeline = &mut pipeline[index];
+                    current_pipeline.1.push(other.to_owned())
+                }
+            }
         }
     }
 
@@ -81,7 +86,6 @@ pub fn parse<S>(args: impl Iterator<Item=S>) -> Behavior where S: AsRef<str> {
         Behavior::Pipeline(pipeline)
     }
 }
-
 
 pub fn execute(behavior: Behavior, stdout: &mut impl Write) -> ExitCode {
     let result = match behavior {
@@ -140,23 +144,41 @@ mod test {
 
     #[test]
     fn parse_unexpected_arg() {
-        assert_eq!(parse(vec!["xyz"].iter()), Behavior::UnexpectedArg("xyz".to_owned()));
+        assert_eq!(
+            parse(vec!["xyz"].iter()),
+            Behavior::UnexpectedArg("xyz".to_owned())
+        );
     }
 
     #[test]
     fn parse_pipelines() {
-        assert_eq!(parse(vec!["--import", "foo", "bar"].iter()), Behavior::Pipeline(vec![
-            PipelineStep(Op::Import, vec!["foo".to_owned(), "bar".to_owned()]),
-        ]));
-        assert_eq!(parse(vec![
-            "--import", "foo", "bar",
-            "--filter", "some|regex",
-            "--export", "dir1", "dir2",
-        ].iter()), Behavior::Pipeline(vec![
-            PipelineStep(Op::Import, vec!["foo".to_owned(), "bar".to_owned()]),
-            PipelineStep(Op::Filter, vec!["some|regex".to_owned()]),
-            PipelineStep(Op::Export, vec!["dir1".to_owned(), "dir2".to_owned()]),
-        ]));
+        assert_eq!(
+            parse(vec!["--import", "foo", "bar"].iter()),
+            Behavior::Pipeline(vec![PipelineStep(
+                Op::Import,
+                vec!["foo".to_owned(), "bar".to_owned()]
+            ),])
+        );
+        assert_eq!(
+            parse(
+                vec![
+                    "--import",
+                    "foo",
+                    "bar",
+                    "--filter",
+                    "some|regex",
+                    "--export",
+                    "dir1",
+                    "dir2",
+                ]
+                .iter()
+            ),
+            Behavior::Pipeline(vec![
+                PipelineStep(Op::Import, vec!["foo".to_owned(), "bar".to_owned()]),
+                PipelineStep(Op::Filter, vec!["some|regex".to_owned()]),
+                PipelineStep(Op::Export, vec!["dir1".to_owned(), "dir2".to_owned()]),
+            ])
+        );
     }
 
     #[test]
@@ -170,43 +192,57 @@ mod test {
     fn execute_version() {
         let mut stdout: Vec<u8> = vec![];
         execute(Behavior::Version, &mut stdout);
-        assert_eq!(String::from_utf8(stdout).unwrap(), env!("CARGO_PKG_VERSION").to_owned() + "\n");
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            env!("CARGO_PKG_VERSION").to_owned() + "\n"
+        );
     }
 
     #[test]
     fn execute_unexpected_arg() {
         let mut stdout: Vec<u8> = vec![];
         execute(Behavior::UnexpectedArg("xyz".into()), &mut stdout);
-        assert_eq!(String::from_utf8(stdout).unwrap(), "Unexpected argument: xyz\n");
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            "Unexpected argument: xyz\n"
+        );
     }
-
 
     #[test]
     fn execute_pipeline_import() {
         let mut stdout: Vec<u8> = vec![];
-        execute(Behavior::Pipeline(vec![
-            PipelineStep(Op::Import, vec!["./fixture".into()]),
-        ]), &mut stdout);
-        assert_eq!(String::from_utf8(stdout).unwrap(), indoc! {"
+        execute(
+            Behavior::Pipeline(vec![PipelineStep(Op::Import, vec!["./fixture".into()])]),
+            &mut stdout,
+        );
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            indoc! {"
             --- Import ---
             json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4
-        "});
+        "}
+        );
     }
 
     #[test]
     fn execute_pipeline_export() {
         let dir = tempfile::tempdir().expect("Failed to create temporary directory");
         let mut stdout: Vec<u8> = vec![];
-        execute(Behavior::Pipeline(vec![
-            PipelineStep(Op::Import, vec!["./fixture".into()]),
-            PipelineStep(Op::Export, vec![dir.path().to_str().unwrap().into()]),
-        ]), &mut stdout);
-        assert_eq!(String::from_utf8(stdout).unwrap(), indoc! {"
+        execute(
+            Behavior::Pipeline(vec![
+                PipelineStep(Op::Import, vec!["./fixture".into()]),
+                PipelineStep(Op::Export, vec![dir.path().to_str().unwrap().into()]),
+            ]),
+            &mut stdout,
+        );
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            indoc! {"
             --- Import ---
             json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4
             --- Export ---
-        "});
+        "}
+        );
         assert!(dir.path().join("dir1/dir2/nested.txt").exists());
     }
-
 }

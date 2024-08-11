@@ -6,7 +6,7 @@
 //! export from domains where a CAS storage model isn't present, like local
 //! directories on your filesystem.
 
+pub mod archive;
 pub mod core;
 pub mod debug;
 pub mod osdir;
-pub mod archive;

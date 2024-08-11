@@ -3,7 +3,10 @@
 pub mod simple;
 use simple::SimpleStorage;
 
-pub fn new<P>(path: P) -> std::io::Result<SimpleStorage<P>> where P: AsRef<std::path::Path> {
+pub fn new<P>(path: P) -> std::io::Result<SimpleStorage<P>>
+where
+    P: AsRef<std::path::Path>,
+{
     SimpleStorage::new(path)
 }
 

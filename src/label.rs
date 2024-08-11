@@ -45,10 +45,14 @@ impl Label {
     }
 
     /// Yields an immutable Path reference.
-    pub fn as_path(&self) -> &Path { self.0.as_ref() }
+    pub fn as_path(&self) -> &Path {
+        self.0.as_ref()
+    }
 
     /// Yields an immutable str reference.
-    pub fn as_str(&self) -> &str { self.0.as_ref() }
+    pub fn as_str(&self) -> &str {
+        self.0.as_ref()
+    }
 }
 
 #[cfg(test)]

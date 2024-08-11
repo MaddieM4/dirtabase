@@ -1,6 +1,7 @@
-pub mod attr;
 pub mod archive;
+pub mod attr;
 pub mod digest;
+pub mod enc;
 pub mod label;
 pub mod op;
 pub mod storage;
