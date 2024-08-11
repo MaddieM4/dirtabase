@@ -4,6 +4,19 @@ use crate::op::gen::*;
 pub enum ParseError {
     ParamBeforeOp(String),
 }
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            ParseError::ParamBeforeOp(param) => write!(f, "Param {:?} occurred before first operation. What should it apply to? We can't guess!", param),
+        }
+    }
+}
+impl std::error::Error for ParseError {}
+impl From<ParseError> for std::io::Error {
+    fn from(p: ParseError) -> Self {
+        Self::other(p)
+    }
+}
 
 fn from_params(_oc: OpCode, params: Vec<String>) -> Result<Op, ParseError> {
     Ok(Op::Import(crate::op::ops::import::Import(params)))

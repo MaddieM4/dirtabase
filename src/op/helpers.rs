@@ -48,6 +48,14 @@ where
     pub fn finish(mut self) -> Result<Triad> {
         self.1.pop().ok_or(Error::other("No archives on the stack"))
     }
+
+    pub fn parse_apply<S>(self, params: impl IntoIterator<Item = S>) -> Result<Self>
+    where
+        Self: Sized,
+        S: AsRef<str>,
+    {
+        self.apply(crate::op::parse::parse(params)?)
+    }
 }
 
 trait Apply<T> {
@@ -131,6 +139,19 @@ mod test {
 
         let ctx = cfg.ctx().apply([op.clone(), op])?;
         assert_eq!(ctx.stack(), &vec![fixture_triad(), fixture_triad()]);
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_apply_op_parsed() -> Result<()> {
+        let store = crate::storage::new_from_tempdir()?;
+        let cfg = Config::new(&store);
+        let ctx = cfg.ctx().parse_apply(["--import", "fixture", "fixture"])?;
+        assert_eq!(ctx.stack(), &vec![fixture_triad(), fixture_triad()]);
+
+        let ctx = cfg.ctx().parse_apply(["foo"]);
+        assert!(ctx.is_err());
+
         Ok(())
     }
 }
