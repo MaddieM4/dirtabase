@@ -1,9 +1,9 @@
 use super::prelude::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Import(pub Vec<String>);
 
-impl Operation for Import {
+impl FromArgs for Import {
     fn from_args<T>(args: impl IntoIterator<Item = T>) -> Result<Self>
     where
         T: AsRef<str>,
@@ -12,8 +12,10 @@ impl Operation for Import {
             args.into_iter().map(|t| t.as_ref().to_owned()).collect(),
         ))
     }
+}
 
-    fn transform<P>(&self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+impl Transform for &Import {
+    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
     where
         P: AsRef<Path>,
     {
