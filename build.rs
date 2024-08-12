@@ -91,6 +91,7 @@ pub enum Op {
         "}
 
 impl Op {
+    #[rustfmt::skip]
     pub fn from_code_and_params(oc: OpCode, params: Vec<String>) -> Result<Op> {
         Ok(match oc {
 "

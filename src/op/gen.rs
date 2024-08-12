@@ -14,6 +14,7 @@ pub enum OpCode {
     Replace,
     Prefix,
     Download,
+    DownloadImpure,
 }
 
 pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
@@ -26,6 +27,7 @@ pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
         "--replace" => Some(OpCode::Replace),
         "--prefix" => Some(OpCode::Prefix),
         "--download" => Some(OpCode::Download),
+        "--download-impure" => Some(OpCode::DownloadImpure),
         _ => None,
     }
 }
@@ -40,9 +42,11 @@ pub enum Op {
     Replace(x::replace::Replace),
     Prefix(x::prefix::Prefix),
     Download(x::download::Download),
+    DownloadImpure(x::download_impure::DownloadImpure),
 }
 
 impl Op {
+    #[rustfmt::skip]
     pub fn from_code_and_params(oc: OpCode, params: Vec<String>) -> Result<Op> {
         Ok(match oc {
             OpCode::Empty => Op::Empty(x::empty::Empty::from_args(params)?),
@@ -53,6 +57,7 @@ impl Op {
             OpCode::Replace => Op::Replace(x::replace::Replace::from_args(params)?),
             OpCode::Prefix => Op::Prefix(x::prefix::Prefix::from_args(params)?),
             OpCode::Download => Op::Download(x::download::Download::from_args(params)?),
+            OpCode::DownloadImpure => Op::DownloadImpure(x::download_impure::DownloadImpure::from_args(params)?),
         })
     }
 }
@@ -71,6 +76,7 @@ impl Transform for &Op {
             Op::Replace(t) => t.transform(cfg, stack),
             Op::Prefix(t) => t.transform(cfg, stack),
             Op::Download(t) => t.transform(cfg, stack),
+            Op::DownloadImpure(t) => t.transform(cfg, stack),
         }
     }
 }
