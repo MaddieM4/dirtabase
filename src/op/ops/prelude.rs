@@ -46,3 +46,26 @@ where
         Ok(args.try_into().unwrap())
     }
 }
+
+pub fn download<P>(
+    store: &crate::storage::simple::SimpleStorage<P>,
+    url: &str,
+) -> Result<crate::digest::Digest>
+where
+    P: AsRef<Path>,
+{
+    let response = reqwest::blocking::get(url).map_err(|e| Error::other(e))?;
+    let digest = store.cas().write(response)?;
+    print!(">> Downloaded {}\n>> Digest: {}\n", url, digest.to_hex());
+    Ok(digest)
+}
+
+pub fn url_filename(given_url: &str) -> Result<String> {
+    let parsed_url = url::Url::parse(&given_url).map_err(|e| Error::other(e))?;
+    Ok(parsed_url
+        .path_segments()
+        .ok_or(Error::other("Could not break URL into path segments"))?
+        .last()
+        .ok_or(Error::other("Could not determine filename"))?
+        .to_owned())
+}
