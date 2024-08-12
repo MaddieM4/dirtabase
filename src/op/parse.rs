@@ -91,10 +91,11 @@ mod test {
     #[test]
     fn parse_mixed_ops() {
         assert_eq!(
-            parse(["--import", "x", "y", "--merge"]),
+            parse(["--import", "x", "y", "--merge", "--empty"]),
             Ok(vec![
                 Op::Import(ops::import::Import(vec!["x".to_owned(), "y".to_owned()])),
                 Op::Merge(ops::merge::Merge),
+                Op::Empty(ops::empty::Empty),
             ])
         )
     }

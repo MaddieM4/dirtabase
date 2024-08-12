@@ -4,7 +4,7 @@ use std::io::{Result, Write};
 // Produces a list of operation names like "cmd_impure".
 // This is based on the "pub mod" list in `src/op/ops.rs`.
 fn list_ops() -> Result<Vec<String>> {
-    let pattern = r"pub mod ([a-z_]*);";
+    let pattern = r"//\!  - ([a-z_]*)";
     let re = regex::Regex::new(pattern).expect("Failed to compile regex");
     let haystack = std::fs::read_to_string("src/op/ops.rs")?;
 
