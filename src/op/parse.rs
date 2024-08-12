@@ -3,11 +3,14 @@ use crate::op::gen::*;
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     ParamBeforeOp(String),
+    UnpackError,
 }
+
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         match self {
             ParseError::ParamBeforeOp(param) => write!(f, "Param {:?} occurred before first operation. What should it apply to? We can't guess!", param),
+            ParseError::UnpackError => write!(f, "Failed to unpack arguments"),
         }
     }
 }
@@ -16,10 +19,6 @@ impl From<ParseError> for std::io::Error {
     fn from(p: ParseError) -> Self {
         Self::other(p)
     }
-}
-
-fn from_params(_oc: OpCode, params: Vec<String>) -> Result<Op, ParseError> {
-    Ok(Op::Import(crate::op::ops::import::Import(params)))
 }
 
 pub fn parse<T>(args: impl IntoIterator<Item = T>) -> Result<Vec<Op>, ParseError>
@@ -38,7 +37,9 @@ where
     }
     output
         .into_iter()
-        .map(|(oc, params)| from_params(oc, params))
+        .map(|(oc, params)| {
+            Op::from_code_and_params(oc, params).map_err(|_| ParseError::UnpackError)
+        })
         .collect()
 }
 
@@ -77,6 +78,23 @@ mod test {
             Ok(vec![
                 Op::Import(ops::import::Import(vec!["x".to_owned()])),
                 Op::Import(ops::import::Import(vec!["y".to_owned()])),
+            ])
+        )
+    }
+
+    #[test]
+    fn parse_merge() {
+        assert_eq!(parse(["--merge"]), Ok(vec![Op::Merge(ops::merge::Merge)]));
+        assert_eq!(parse(["--merge", "an arg"]), Err(ParseError::UnpackError));
+    }
+
+    #[test]
+    fn parse_mixed_ops() {
+        assert_eq!(
+            parse(["--import", "x", "y", "--merge"]),
+            Ok(vec![
+                Op::Import(ops::import::Import(vec!["x".to_owned(), "y".to_owned()])),
+                Op::Merge(ops::merge::Merge),
             ])
         )
     }

@@ -1,4 +1,4 @@
-use crate::archive::core::Triad;
+use crate::archive::core::{Archive, Triad, TriadFormat};
 use crate::enc::Settings as Enc;
 use crate::op::gen::Op;
 use crate::storage::simple::SimpleStorage;
@@ -26,6 +26,21 @@ where
 
     pub fn ctx(&'a self) -> Context<'a, P> {
         Context(self, vec![])
+    }
+
+    pub fn read_archive(&self, t: &Triad) -> Result<Archive> {
+        let (f, c, d) = (t.0, t.1, t.2);
+        let f = match f {
+            TriadFormat::File => Err(Error::other("All input triads must be archives")),
+            TriadFormat::Archive(f) => Ok(f),
+        };
+        crate::archive::api::read_archive(f?, c, &d, self.store)
+    }
+
+    pub fn write_archive(&self, ar: &Archive) -> Result<Triad> {
+        let (store, f, c) = (self.store, self.enc.f(), self.enc.c());
+        let digest = crate::archive::api::write_archive(ar, f, c, store)?;
+        Ok(Triad(TriadFormat::Archive(f), c, digest))
     }
 }
 
