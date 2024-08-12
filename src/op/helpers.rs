@@ -3,7 +3,7 @@ use crate::enc::Settings as Enc;
 use crate::logger::Logger;
 use crate::op::gen::Op;
 use crate::storage::simple::SimpleStorage;
-use std::io::{Error, Result};
+use std::io::{Error, Result, Write};
 use std::path::Path;
 
 pub struct Config<'a, P>
@@ -118,29 +118,44 @@ where
 }
 
 pub trait Transform {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>;
 
-    fn header_name() -> &'static str {
+    fn header_name(&self) -> &'static str {
         "Unknown"
     }
 }
 
-impl<T> Transform for T
-where
-    T: IntoIterator<Item = Op>,
-{
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+impl<const N: usize> Transform for [Op; N] {
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
         for item in self {
+            write!(ctx.log.opheader(), "--- {} ---\n", item.header_name())?;
             item.transform(ctx)?;
         }
         Ok(())
     }
 }
+
+impl Transform for Vec<Op> {
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        for item in self {
+            write!(ctx.log.opheader(), "--- {} ---\n", item.header_name())?;
+            item.transform(ctx)?;
+            for triad in &ctx.stack {
+                write!(ctx.log.stack(), "{}\n", triad)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 pub trait FromArgs {
     fn from_args<T>(args: impl IntoIterator<Item = T>) -> Result<Self>
     where
@@ -156,7 +171,7 @@ mod test {
     #[test]
     fn simple_ctx_example() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let mut log = Logger::default();
+        let mut log = crate::logger::vec_logger();
 
         let t: Triad = subvert(&store, &mut log)
             .apply(&crate::op::ops::import::Import(vec!["fixture".to_owned()]))?
@@ -168,10 +183,10 @@ mod test {
     #[test]
     fn ctx_apply_op_enum() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let mut log = Logger::default();
+        let mut log = crate::logger::vec_logger();
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
-        let ctx = subvert(&store, &mut log).apply(&op)?;
+        let ctx = subvert(&store, &mut log).apply(op)?;
         assert_eq!(ctx.stack, vec![fixture_triad()]);
         Ok(())
     }
@@ -179,7 +194,7 @@ mod test {
     #[test]
     fn ctx_apply_op_seq() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let mut log = Logger::default();
+        let mut log = crate::logger::vec_logger();
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
         let ctx = subvert(&store, &mut log).apply([op.clone(), op])?;
@@ -190,7 +205,7 @@ mod test {
     #[test]
     fn ctx_apply_op_parsed() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let mut log = Logger::default();
+        let mut log = crate::logger::vec_logger();
         let ctx = subvert(&store, &mut log).parse_apply(["--import", "fixture", "fixture"])?;
         assert_eq!(ctx.stack, vec![fixture_triad(), fixture_triad()]);
 

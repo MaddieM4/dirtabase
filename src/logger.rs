@@ -12,6 +12,9 @@ pub struct Policies {
     /// Whether to print a message like "--- Import ---" before operations.
     pub opheader: Policy,
 
+    /// Triad stack logging after each opheader.
+    pub stack: Policy,
+
     /// Whether to print "--- [some shell command] ---" before running commands.
     pub cmd: Policy,
 }
@@ -20,6 +23,7 @@ impl Default for Policies {
     fn default() -> Self {
         Self {
             opheader: Policy::Stdout,
+            stack: Policy::Stdout,
             cmd: Policy::Stdout,
         }
     }
@@ -105,6 +109,9 @@ impl Logger {
 
     pub fn opheader(&mut self) -> &mut WriteBackend {
         self.lw_for(self.pol.opheader)
+    }
+    pub fn stack(&mut self) -> &mut WriteBackend {
+        self.lw_for(self.pol.stack)
     }
     pub fn cmd(&mut self) -> &mut WriteBackend {
         self.lw_for(self.pol.cmd)

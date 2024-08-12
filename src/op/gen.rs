@@ -66,8 +66,8 @@ impl Op {
     }
 }
 
-impl Transform for &Op {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+impl Transform for Op {
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
@@ -82,6 +82,21 @@ impl Transform for &Op {
             Op::Download(t) => t.transform(ctx),
             Op::DownloadImpure(t) => t.transform(ctx),
             Op::CmdImpure(t) => t.transform(ctx),
+        }
+    }
+
+    fn header_name(&self) -> &'static str {
+        match self {
+            Op::Empty(_) => "Empty",
+            Op::Import(_) => "Import",
+            Op::Export(_) => "Export",
+            Op::Merge(_) => "Merge",
+            Op::Filter(_) => "Filter",
+            Op::Replace(_) => "Replace",
+            Op::Prefix(_) => "Prefix",
+            Op::Download(_) => "Download",
+            Op::DownloadImpure(_) => "DownloadImpure",
+            Op::CmdImpure(_) => "CmdImpure",
         }
     }
 }

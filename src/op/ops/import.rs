@@ -15,7 +15,7 @@ impl FromArgs for Import {
 }
 
 impl Transform for &Import {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {

@@ -18,7 +18,7 @@ impl FromArgs for Prefix {
 }
 
 impl Transform for &Prefix {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {

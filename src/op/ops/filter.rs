@@ -14,7 +14,7 @@ impl FromArgs for Filter {
 }
 
 impl Transform for &Filter {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {

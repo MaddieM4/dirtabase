@@ -14,7 +14,7 @@ impl FromArgs for Merge {
 }
 
 impl Transform for &Merge {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {

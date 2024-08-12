@@ -16,7 +16,7 @@ impl FromArgs for DownloadImpure {
 }
 
 impl Transform for &DownloadImpure {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {

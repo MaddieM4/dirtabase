@@ -18,7 +18,7 @@ impl FromArgs for Download {
 }
 
 impl Transform for &Download {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {

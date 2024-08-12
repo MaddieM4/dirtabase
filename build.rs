@@ -113,8 +113,8 @@ impl Op {
     }
 }
 
-impl Transform for &Op {
-    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
+impl Transform for Op {
+    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
@@ -125,6 +125,24 @@ impl Transform for &Op {
         write!(
             f,
             "            Op::{}(t) => t.transform(ctx),\n",
+            titlecase(op)
+        )?;
+    }
+    write!(
+        f,
+        "{}",
+        "        }
+    }
+
+    fn header_name(&self) -> &'static str {
+        match self {
+"
+    )?;
+    for op in ops.iter() {
+        write!(
+            f,
+            "            Op::{}(_) => \"{}\",\n",
+            titlecase(op),
             titlecase(op)
         )?;
     }
