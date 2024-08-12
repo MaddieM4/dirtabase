@@ -53,8 +53,8 @@ mod test {
 
     #[test]
     fn transform() -> Result<()> {
-        let store = crate::storage::new_from_tempdir()?;
-        let cfg = Config::new(&store);
+        let (store, mut log) = basic_kit();
+        let cfg = Config::new(&store, &mut log);
         let op = Prefix("some".into(), "deep/old".into());
         let dt = crate::stream::debug::source(crate::stream::archive::sink(&store))?;
         let [rt1, rt2] = random_triads();

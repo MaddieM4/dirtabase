@@ -37,8 +37,8 @@ mod test {
 
     #[test]
     fn transform() -> Result<()> {
-        let store = crate::storage::new_from_tempdir()?;
-        let cfg = Config::new(&store);
+        let (store, mut log) = basic_kit();
+        let cfg = Config::new(&store, &mut log);
         let op = Empty;
         let [rt1, rt2, rt3] = random_triads();
 

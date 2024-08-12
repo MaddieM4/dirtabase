@@ -1,7 +1,10 @@
 use crate::archive::core::Archive;
 pub use crate::archive::core::Triad;
 use crate::digest::Digest;
+use crate::logger::Logger;
+use crate::storage::simple::SimpleStorage;
 pub use indoc::indoc;
+use tempfile::TempDir;
 
 fn triad(hexdigest: impl AsRef<str>) -> Triad {
     let txt = str::replace(
@@ -40,13 +43,16 @@ pub fn random_triads<const N: usize>() -> [Triad; N] {
         .unwrap()
 }
 
-pub fn print_archive<P>(
-    store: &crate::storage::simple::SimpleStorage<P>,
-    t: Triad,
-) -> std::io::Result<String>
+pub fn print_archive<P>(store: &SimpleStorage<P>, t: Triad) -> std::io::Result<String>
 where
     P: AsRef<std::path::Path>,
 {
     let sink = crate::stream::debug::sink();
     crate::stream::archive::source(store, t, sink)
+}
+
+pub fn basic_kit() -> (SimpleStorage<TempDir>, Logger) {
+    let store = crate::storage::new_from_tempdir().expect("Failed to create tempdir");
+    let log = crate::logger::vec_logger();
+    (store, log)
 }

@@ -68,11 +68,7 @@ where
     }
 }
 
-pub fn execute<OUT, ERR>(behavior: Behavior, log: &mut Logger<OUT, ERR>) -> ExitCode
-where
-    OUT: std::io::Write,
-    ERR: std::io::Write,
-{
+pub fn execute(behavior: Behavior, log: &mut Logger) -> ExitCode {
     let result = match behavior {
         Behavior::Help => write!(log.stdout, "{}", USAGE),
         Behavior::Version => write!(log.stdout, "{}\n", env!("CARGO_PKG_VERSION")),
@@ -89,16 +85,9 @@ where
     }
 }
 
-fn execute_pipeline<OUT, ERR>(
-    steps: Vec<String>,
-    _log: &mut Logger<OUT, ERR>,
-) -> std::io::Result<()>
-where
-    OUT: std::io::Write,
-    ERR: std::io::Write,
-{
+fn execute_pipeline(steps: Vec<String>, log: &mut Logger) -> std::io::Result<()> {
     let store = crate::storage::new("./.dirtabase_db")?;
-    let cfg = crate::op::helpers::Config::new(&store);
+    let cfg = crate::op::helpers::Config::new(&store, log);
     cfg.ctx().parse_apply(steps)?;
     Ok(())
 }
@@ -138,48 +127,37 @@ mod test {
 
     #[test]
     fn execute_help() {
-        let mut stdout: Vec<u8> = vec![];
-        let mut stderr: Vec<u8> = vec![];
-        let mut log = Logger::new(&mut stdout, &mut stderr);
+        let mut log = crate::logger::vec_logger();
         execute(Behavior::Help, &mut log);
-        assert_eq!(&String::from_utf8(stdout).unwrap(), USAGE);
+        assert_eq!(log.stdout.recorded().unwrap(), USAGE);
     }
 
     #[test]
     fn execute_version() {
-        let mut stdout: Vec<u8> = vec![];
-        let mut stderr: Vec<u8> = vec![];
-        let mut log = Logger::new(&mut stdout, &mut stderr);
+        let mut log = crate::logger::vec_logger();
         execute(Behavior::Version, &mut log);
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            log.stdout.recorded().unwrap(),
             env!("CARGO_PKG_VERSION").to_owned() + "\n"
         );
     }
 
     #[test]
     fn execute_unexpected_arg() {
-        let mut stdout: Vec<u8> = vec![];
-        let mut stderr: Vec<u8> = vec![];
-        let mut log = Logger::new(&mut stdout, &mut stderr);
+        let mut log = crate::logger::vec_logger();
         execute(Behavior::UnexpectedArg("xyz".into()), &mut log);
-        assert_eq!(
-            String::from_utf8(stdout).unwrap(),
-            "Unexpected argument: xyz\n"
-        );
+        assert_eq!(log.stdout.recorded().unwrap(), "Unexpected argument: xyz\n");
     }
 
     #[test]
     fn execute_pipeline_import() {
-        let mut stdout: Vec<u8> = vec![];
-        let mut stderr: Vec<u8> = vec![];
-        let mut log = Logger::new(&mut stdout, &mut stderr);
+        let mut log = crate::logger::vec_logger();
         execute(
             Behavior::Pipeline(vec!["--import".into(), "./fixture".into()]),
             &mut log,
         );
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            log.stdout.recorded().unwrap(),
             indoc! {"
             --- Import ---
             json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4
@@ -189,9 +167,7 @@ mod test {
 
     #[test]
     fn execute_pipeline_export() {
-        let mut stdout: Vec<u8> = vec![];
-        let mut stderr: Vec<u8> = vec![];
-        let mut log = Logger::new(&mut stdout, &mut stderr);
+        let mut log = crate::logger::vec_logger();
         let dir = tempfile::tempdir().expect("Failed to create temporary directory");
         execute(
             Behavior::Pipeline(vec![
@@ -203,7 +179,7 @@ mod test {
             &mut log,
         );
         assert_eq!(
-            String::from_utf8(stdout).unwrap(),
+            log.stdout.recorded().unwrap(),
             indoc! {"
             --- Import ---
             json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4

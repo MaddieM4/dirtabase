@@ -63,8 +63,8 @@ mod test {
 
     #[test]
     fn transform() -> Result<()> {
-        let store = crate::storage::new_from_tempdir()?;
-        let cfg = Config::new(&store);
+        let (store, mut log) = basic_kit();
+        let cfg = Config::new(&store, &mut log);
         let op = Download(
             "https://gist.githubusercontent.com/MaddieM4/92f0719922db5fbd60a12d762deca9ae/raw/37a4fe4d300b6a88913a808095fd52c1c356030a/reproducible.txt".into(),
             Digest::from("This exists for testing the pure downloads feature of Dirtabase."),

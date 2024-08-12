@@ -16,9 +16,7 @@ use std::io;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let (mut stdout, mut stderr) = (io::stdout(), io::stderr());
-    let mut logger = logger::Logger::new(&mut stdout, &mut stderr);
-
+    let mut log = logger::real_logger();
     let behavior = cli::parse(args().skip(1));
-    cli::execute(behavior, &mut logger)
+    cli::execute(behavior, &mut log)
 }

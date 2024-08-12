@@ -1,5 +1,6 @@
 use crate::archive::core::{Archive, Triad, TriadFormat};
 use crate::enc::Settings as Enc;
+use crate::logger::Logger;
 use crate::op::gen::Op;
 use crate::storage::simple::SimpleStorage;
 use std::io::{Error, Result};
@@ -11,16 +12,18 @@ where
 {
     pub store: &'a SimpleStorage<P>,
     pub enc: Enc,
+    pub log: &'a mut Logger,
 }
 
 impl<'a, P> Config<'a, P>
 where
     P: AsRef<Path>,
 {
-    pub fn new(store: &'a SimpleStorage<P>) -> Self {
+    pub fn new(store: &'a SimpleStorage<P>, log: &'a mut Logger) -> Self {
         Self {
             store: store,
             enc: Enc::default(),
+            log: log,
         }
     }
 
@@ -125,7 +128,8 @@ mod test {
     #[test]
     fn simple_ctx_example() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let cfg = Config::new(&store);
+        let mut log = Logger::default();
+        let cfg = Config::new(&store, &mut log);
 
         let t: Triad = cfg
             .ctx()
@@ -138,7 +142,8 @@ mod test {
     #[test]
     fn ctx_apply_op_enum() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let cfg = Config::new(&store);
+        let mut log = Logger::default();
+        let cfg = Config::new(&store, &mut log);
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
         let ctx = cfg.ctx().apply(&op)?;
@@ -149,7 +154,8 @@ mod test {
     #[test]
     fn ctx_apply_op_seq() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let cfg = Config::new(&store);
+        let mut log = Logger::default();
+        let cfg = Config::new(&store, &mut log);
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
         let ctx = cfg.ctx().apply([op.clone(), op])?;
@@ -160,7 +166,8 @@ mod test {
     #[test]
     fn ctx_apply_op_parsed() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
-        let cfg = Config::new(&store);
+        let mut log = Logger::default();
+        let cfg = Config::new(&store, &mut log);
         let ctx = cfg.ctx().parse_apply(["--import", "fixture", "fixture"])?;
         assert_eq!(ctx.stack(), &vec![fixture_triad(), fixture_triad()]);
 
