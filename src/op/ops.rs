@@ -12,14 +12,15 @@
 //!  - merge
 //!  - filter
 //!  - replace
+//!  - prefix
 
 pub mod empty;
 pub mod export;
 pub mod filter;
 pub mod import;
 pub mod merge;
+pub mod prefix;
 pub mod replace;
-// pub mod prefix;
 // pub mod download;
 // pub mod download_impure;
 // pub mod cmd_impure;

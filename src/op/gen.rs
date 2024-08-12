@@ -11,6 +11,7 @@ pub enum OpCode {
     Merge,
     Filter,
     Replace,
+    Prefix,
 }
 
 pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
@@ -21,6 +22,7 @@ pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
         "--merge" => Some(OpCode::Merge),
         "--filter" => Some(OpCode::Filter),
         "--replace" => Some(OpCode::Replace),
+        "--prefix" => Some(OpCode::Prefix),
         _ => None,
     }
 }
@@ -33,6 +35,7 @@ pub enum Op {
     Merge(crate::op::ops::merge::Merge),
     Filter(crate::op::ops::filter::Filter),
     Replace(crate::op::ops::replace::Replace),
+    Prefix(crate::op::ops::prefix::Prefix),
 }
 
 impl Op {
@@ -44,6 +47,7 @@ impl Op {
             OpCode::Merge => Op::Merge(crate::op::ops::merge::Merge::from_args(params)?),
             OpCode::Filter => Op::Filter(crate::op::ops::filter::Filter::from_args(params)?),
             OpCode::Replace => Op::Replace(crate::op::ops::replace::Replace::from_args(params)?),
+            OpCode::Prefix => Op::Prefix(crate::op::ops::prefix::Prefix::from_args(params)?),
         })
     }
 }
@@ -60,6 +64,7 @@ impl Transform for &Op {
             Op::Merge(t) => t.transform(cfg, stack),
             Op::Filter(t) => t.transform(cfg, stack),
             Op::Replace(t) => t.transform(cfg, stack),
+            Op::Prefix(t) => t.transform(cfg, stack),
         }
     }
 }

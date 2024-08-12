@@ -39,3 +39,14 @@ pub fn random_triads<const N: usize>() -> [Triad; N] {
         .try_into()
         .unwrap()
 }
+
+pub fn print_archive<P>(
+    store: &crate::storage::simple::SimpleStorage<P>,
+    t: Triad,
+) -> std::io::Result<String>
+where
+    P: AsRef<std::path::Path>,
+{
+    let sink = crate::stream::debug::sink();
+    crate::stream::archive::source(store, t, sink)
+}
