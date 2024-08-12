@@ -11,16 +11,17 @@
 //!  - export
 //!  - merge
 //!  - filter
+//!  - replace
 
 pub mod empty;
 pub mod export;
 pub mod filter;
 pub mod import;
 pub mod merge;
-// replace
-// prefix
-// download
-// download_impure
-// cmd_impure
+pub mod replace;
+// pub mod prefix;
+// pub mod download;
+// pub mod download_impure;
+// pub mod cmd_impure;
 
 mod prelude;
