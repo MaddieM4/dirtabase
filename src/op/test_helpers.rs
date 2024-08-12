@@ -1,6 +1,7 @@
 use crate::archive::core::Archive;
 pub use crate::archive::core::Triad;
 use crate::digest::Digest;
+pub use indoc::indoc;
 
 fn triad(hexdigest: impl AsRef<str>) -> Triad {
     let txt = str::replace(

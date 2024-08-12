@@ -10,12 +10,13 @@
 //!  - import
 //!  - export
 //!  - merge
+//!  - filter
 
 pub mod empty;
 pub mod export;
+pub mod filter;
 pub mod import;
 pub mod merge;
-// filter
 // replace
 // prefix
 // download

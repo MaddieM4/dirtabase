@@ -9,6 +9,7 @@ pub enum OpCode {
     Import,
     Export,
     Merge,
+    Filter,
 }
 
 pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
@@ -17,6 +18,7 @@ pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
         "--import" => Some(OpCode::Import),
         "--export" => Some(OpCode::Export),
         "--merge" => Some(OpCode::Merge),
+        "--filter" => Some(OpCode::Filter),
         _ => None,
     }
 }
@@ -27,6 +29,7 @@ pub enum Op {
     Import(crate::op::ops::import::Import),
     Export(crate::op::ops::export::Export),
     Merge(crate::op::ops::merge::Merge),
+    Filter(crate::op::ops::filter::Filter),
 }
 
 impl Op {
@@ -36,6 +39,7 @@ impl Op {
             OpCode::Import => Op::Import(crate::op::ops::import::Import::from_args(params)?),
             OpCode::Export => Op::Export(crate::op::ops::export::Export::from_args(params)?),
             OpCode::Merge => Op::Merge(crate::op::ops::merge::Merge::from_args(params)?),
+            OpCode::Filter => Op::Filter(crate::op::ops::filter::Filter::from_args(params)?),
         })
     }
 }
@@ -50,6 +54,7 @@ impl Transform for &Op {
             Op::Import(t) => t.transform(cfg, stack),
             Op::Export(t) => t.transform(cfg, stack),
             Op::Merge(t) => t.transform(cfg, stack),
+            Op::Filter(t) => t.transform(cfg, stack),
         }
     }
 }
