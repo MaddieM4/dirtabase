@@ -1,9 +1,11 @@
 use crate::archive::core::Triad;
+use crate::logger::Logger;
 use crate::op::{perform as perform_op, Op};
 use indoc::indoc;
 use std::io::Write;
 use std::process::ExitCode;
 
+// TODO: Generate this based on docs from src/op/ops/*.rs
 const USAGE: &'static str = indoc! {"
     usage: dirtabase [--help|--version|pipeline...]
 
@@ -37,83 +39,67 @@ const USAGE: &'static str = indoc! {"
      --cmd-impure 'echo \"some text\" > file.txt'
 "};
 
-#[derive(PartialEq, Debug)]
-pub struct PipelineStep(Op, Vec<String>);
-
 /// What we decide to do based on CLI arguments
 #[derive(PartialEq, Debug)]
 pub enum Behavior {
     Help,
     Version,
     UnexpectedArg(String),
-    Pipeline(Vec<PipelineStep>),
+    Pipeline(Vec<String>),
 }
 
 pub fn parse<S>(args: impl Iterator<Item = S>) -> Behavior
 where
     S: AsRef<str>,
 {
-    let mut pipeline: Vec<PipelineStep> = vec![];
-
+    let mut pipeline_args: Vec<String> = vec![];
     for arg in args {
         match arg.as_ref() {
             "--version" => return Behavior::Version,
             "--help" => return Behavior::Help,
-            "--empty" => pipeline.push(PipelineStep(Op::Empty, vec![])),
-            "--import" => pipeline.push(PipelineStep(Op::Import, vec![])),
-            "--export" => pipeline.push(PipelineStep(Op::Export, vec![])),
-            "--merge" => pipeline.push(PipelineStep(Op::Merge, vec![])),
-            "--filter" => pipeline.push(PipelineStep(Op::Filter, vec![])),
-            "--replace" => pipeline.push(PipelineStep(Op::Replace, vec![])),
-            "--prefix" => pipeline.push(PipelineStep(Op::Prefix, vec![])),
-            "--cmd-impure" => pipeline.push(PipelineStep(Op::CmdImpure, vec![])),
-
-            other => {
-                if pipeline.is_empty() {
-                    return Behavior::UnexpectedArg(other.to_owned());
-                } else {
-                    let index = pipeline.len() - 1;
-                    let current_pipeline = &mut pipeline[index];
-                    current_pipeline.1.push(other.to_owned())
-                }
-            }
+            other => pipeline_args.push(other.to_owned()),
         }
     }
 
-    if pipeline.is_empty() {
+    if pipeline_args.is_empty() {
         Behavior::Help
     } else {
-        Behavior::Pipeline(pipeline)
+        Behavior::Pipeline(pipeline_args)
     }
 }
 
-pub fn execute(behavior: Behavior, stdout: &mut impl Write) -> ExitCode {
+pub fn execute<OUT, ERR>(behavior: Behavior, log: &mut Logger<OUT, ERR>) -> ExitCode
+where
+    OUT: std::io::Write,
+    ERR: std::io::Write,
+{
     let result = match behavior {
-        Behavior::Help => write!(stdout, "{}", USAGE),
-        Behavior::Version => write!(stdout, "{}\n", env!("CARGO_PKG_VERSION")),
-        Behavior::UnexpectedArg(a) => write!(stdout, "Unexpected argument: {}\n", a),
-        Behavior::Pipeline(steps) => execute_pipeline(steps, stdout),
+        Behavior::Help => write!(log.stdout, "{}", USAGE),
+        Behavior::Version => write!(log.stdout, "{}\n", env!("CARGO_PKG_VERSION")),
+        Behavior::UnexpectedArg(a) => write!(log.stdout, "Unexpected argument: {}\n", a),
+        Behavior::Pipeline(args) => execute_pipeline(args, log),
     };
     match result {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
-            write!(stdout, "Failed to execute: {:?}\n", e).expect("Failed to print failure msg");
+            write!(log.stdout, "Failed to execute: {:?}\n", e)
+                .expect("Failed to print failure msg");
             ExitCode::from(1)
         }
     }
 }
 
-fn execute_pipeline(steps: Vec<PipelineStep>, stdout: &mut impl Write) -> std::io::Result<()> {
+fn execute_pipeline<OUT, ERR>(
+    steps: Vec<String>,
+    _log: &mut Logger<OUT, ERR>,
+) -> std::io::Result<()>
+where
+    OUT: std::io::Write,
+    ERR: std::io::Write,
+{
     let store = crate::storage::new("./.dirtabase_db")?;
-    let mut triads: Vec<Triad> = vec![];
-    for step in steps {
-        let (op, params) = (step.0, step.1);
-        write!(stdout, "--- {:?} ---\n", op)?;
-        triads = perform_op(op, &store, triads, params)?;
-        for t in &triads {
-            write!(stdout, "{}\n", t)?;
-        }
-    }
+    let cfg = crate::op::helpers::Config::new(&store);
+    cfg.ctx().parse_apply(steps)?;
     Ok(())
 }
 
@@ -143,55 +129,28 @@ mod test {
     }
 
     #[test]
-    fn parse_unexpected_arg() {
-        assert_eq!(
-            parse(vec!["xyz"].iter()),
-            Behavior::UnexpectedArg("xyz".to_owned())
-        );
-    }
-
-    #[test]
     fn parse_pipelines() {
         assert_eq!(
             parse(vec!["--import", "foo", "bar"].iter()),
-            Behavior::Pipeline(vec![PipelineStep(
-                Op::Import,
-                vec!["foo".to_owned(), "bar".to_owned()]
-            ),])
-        );
-        assert_eq!(
-            parse(
-                vec![
-                    "--import",
-                    "foo",
-                    "bar",
-                    "--filter",
-                    "some|regex",
-                    "--export",
-                    "dir1",
-                    "dir2",
-                ]
-                .iter()
-            ),
-            Behavior::Pipeline(vec![
-                PipelineStep(Op::Import, vec!["foo".to_owned(), "bar".to_owned()]),
-                PipelineStep(Op::Filter, vec!["some|regex".to_owned()]),
-                PipelineStep(Op::Export, vec!["dir1".to_owned(), "dir2".to_owned()]),
-            ])
+            Behavior::Pipeline(vec!["--import".into(), "foo".into(), "bar".into()])
         );
     }
 
     #[test]
     fn execute_help() {
         let mut stdout: Vec<u8> = vec![];
-        execute(Behavior::Help, &mut stdout);
+        let mut stderr: Vec<u8> = vec![];
+        let mut log = Logger::new(&mut stdout, &mut stderr);
+        execute(Behavior::Help, &mut log);
         assert_eq!(&String::from_utf8(stdout).unwrap(), USAGE);
     }
 
     #[test]
     fn execute_version() {
         let mut stdout: Vec<u8> = vec![];
-        execute(Behavior::Version, &mut stdout);
+        let mut stderr: Vec<u8> = vec![];
+        let mut log = Logger::new(&mut stdout, &mut stderr);
+        execute(Behavior::Version, &mut log);
         assert_eq!(
             String::from_utf8(stdout).unwrap(),
             env!("CARGO_PKG_VERSION").to_owned() + "\n"
@@ -201,7 +160,9 @@ mod test {
     #[test]
     fn execute_unexpected_arg() {
         let mut stdout: Vec<u8> = vec![];
-        execute(Behavior::UnexpectedArg("xyz".into()), &mut stdout);
+        let mut stderr: Vec<u8> = vec![];
+        let mut log = Logger::new(&mut stdout, &mut stderr);
+        execute(Behavior::UnexpectedArg("xyz".into()), &mut log);
         assert_eq!(
             String::from_utf8(stdout).unwrap(),
             "Unexpected argument: xyz\n"
@@ -211,9 +172,11 @@ mod test {
     #[test]
     fn execute_pipeline_import() {
         let mut stdout: Vec<u8> = vec![];
+        let mut stderr: Vec<u8> = vec![];
+        let mut log = Logger::new(&mut stdout, &mut stderr);
         execute(
-            Behavior::Pipeline(vec![PipelineStep(Op::Import, vec!["./fixture".into()])]),
-            &mut stdout,
+            Behavior::Pipeline(vec!["--import".into(), "./fixture".into()]),
+            &mut log,
         );
         assert_eq!(
             String::from_utf8(stdout).unwrap(),
@@ -226,14 +189,18 @@ mod test {
 
     #[test]
     fn execute_pipeline_export() {
-        let dir = tempfile::tempdir().expect("Failed to create temporary directory");
         let mut stdout: Vec<u8> = vec![];
+        let mut stderr: Vec<u8> = vec![];
+        let mut log = Logger::new(&mut stdout, &mut stderr);
+        let dir = tempfile::tempdir().expect("Failed to create temporary directory");
         execute(
             Behavior::Pipeline(vec![
-                PipelineStep(Op::Import, vec!["./fixture".into()]),
-                PipelineStep(Op::Export, vec![dir.path().to_str().unwrap().into()]),
+                "--import".into(),
+                "./fixture".into(),
+                "--export".into(),
+                dir.path().to_str().unwrap().into(),
             ]),
-            &mut stdout,
+            &mut log,
         );
         assert_eq!(
             String::from_utf8(stdout).unwrap(),
