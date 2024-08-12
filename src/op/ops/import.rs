@@ -15,15 +15,15 @@ impl FromArgs for Import {
 }
 
 impl Transform for &Import {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
         for path in &self.0 {
-            let sink = crate::stream::archive::sink(cfg.store);
-            stack.push(crate::stream::osdir::source(path, sink)?);
+            let sink = crate::stream::archive::sink(ctx.store);
+            ctx.stack.push(crate::stream::osdir::source(path, sink)?);
         }
-        Ok(stack)
+        Ok(())
     }
 }
 
@@ -45,24 +45,32 @@ mod test {
     #[test]
     fn transform() -> Result<()> {
         let (store, mut log) = basic_kit();
-        let cfg = Config::new(&store, &mut log);
         let [rt1, rt2] = random_triads();
         let f = fixture_triad();
 
         // Zero arguments
         let op = Import::from_args([] as [&str; 0])?;
-        assert_eq!(op.transform(&cfg, vec![])?, vec![]);
-        assert_eq!(op.transform(&cfg, vec![rt1, rt2])?, vec![rt1, rt2]);
+        assert_eq!(subvert(&store, &mut log).apply(&op)?.stack, vec![]);
+        assert_eq!(
+            subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
+            vec![rt1, rt2]
+        );
 
         // One argument
         let op = Import::from_args(["fixture"])?;
-        assert_eq!(op.transform(&cfg, vec![])?, vec![f]);
-        assert_eq!(op.transform(&cfg, vec![rt1, rt2])?, vec![rt1, rt2, f]);
+        assert_eq!(subvert(&store, &mut log).apply(&op)?.stack, vec![f]);
+        assert_eq!(
+            subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
+            vec![rt1, rt2, f]
+        );
 
         // Two arguments
         let op = Import::from_args(["fixture", "fixture"])?;
-        assert_eq!(op.transform(&cfg, vec![])?, vec![f, f]);
-        assert_eq!(op.transform(&cfg, vec![rt1, rt2])?, vec![rt1, rt2, f, f]);
+        assert_eq!(subvert(&store, &mut log).apply(&op)?.stack, vec![f, f]);
+        assert_eq!(
+            subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
+            vec![rt1, rt2, f, f]
+        );
 
         Ok(())
     }

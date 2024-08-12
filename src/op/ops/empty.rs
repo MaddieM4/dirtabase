@@ -14,12 +14,12 @@ impl FromArgs for Empty {
 }
 
 impl Transform for &Empty {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
-        stack.push(cfg.write_archive(&vec![])?);
-        Ok(stack)
+        ctx.stack.push(ctx.write_archive(&vec![])?);
+        Ok(())
     }
 }
 
@@ -38,16 +38,21 @@ mod test {
     #[test]
     fn transform() -> Result<()> {
         let (store, mut log) = basic_kit();
-        let cfg = Config::new(&store, &mut log);
         let op = Empty;
         let [rt1, rt2, rt3] = random_triads();
 
         // Zero input triads
-        assert_eq!(op.transform(&cfg, vec![])?, vec![empty_triad()]);
+        assert_eq!(
+            subvert(&store, &mut log).apply(&op)?.stack,
+            vec![empty_triad()]
+        );
 
         // Always appends
         assert_eq!(
-            op.transform(&cfg, vec![rt1, rt2, rt3])?,
+            subvert(&store, &mut log)
+                .with([rt1, rt2, rt3])
+                .apply(&op)?
+                .stack,
             vec![rt1, rt2, rt3, empty_triad()]
         );
 

@@ -14,17 +14,18 @@ impl FromArgs for Filter {
 }
 
 impl Transform for &Filter {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
         let re = regex::Regex::new(&self.0).map_err(|e| Error::other(e))?;
-        let t = stack
+        let t = ctx
+            .stack
             .pop()
             .ok_or(Error::other("Need an archive to filter"))?;
-        let ar = crate::archive::api::filter(cfg.read_archive(&t)?, &re);
-        stack.push(cfg.write_archive(&ar)?);
-        Ok(stack)
+        let ar = crate::archive::api::filter(ctx.read_archive(&t)?, &re);
+        ctx.stack.push(ctx.write_archive(&ar)?);
+        Ok(())
     }
 }
 
@@ -44,16 +45,18 @@ mod test {
     #[test]
     fn transform() -> Result<()> {
         let (store, mut log) = basic_kit();
-        let cfg = Config::new(&store, &mut log);
         let op = Filter("hello".into());
 
         // Zero input triads
-        assert!(op.transform(&cfg, vec![]).is_err());
+        assert!(subvert(&store, &mut log).apply(&op).is_err());
 
         // Always filters the top archive on the stack, ignoring lower ones
         let dt = crate::stream::debug::source(crate::stream::archive::sink(&store))?;
         let [rt1, rt2] = random_triads();
-        let stack = op.transform(&cfg, vec![rt1, rt2, dt])?;
+        let stack = subvert(&store, &mut log)
+            .with([rt1, rt2, dt])
+            .apply(&op)?
+            .stack;
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
         assert_eq!(stack[1], rt2);

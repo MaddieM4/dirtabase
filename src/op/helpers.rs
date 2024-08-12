@@ -27,8 +27,78 @@ where
         }
     }
 
-    pub fn ctx(&'a self) -> Context<'a, P> {
-        Context(self, vec![])
+    pub fn ctx(&'a mut self) -> Context<'a, P> {
+        self.ctx_with(vec![])
+    }
+
+    pub fn ctx_with(&'a mut self, stack: impl Into<Vec<Triad>>) -> Context<'a, P> {
+        Context {
+            store: self.store,
+            enc: self.enc,
+            log: self.log,
+            stack: stack.into(),
+        }
+    }
+
+    pub fn build(
+        &'a mut self,
+        stack: impl Into<Stack>,
+        transformer: impl Transform,
+    ) -> Result<Stack> {
+        Ok(self.ctx_with(stack).apply(transformer)?.stack)
+    }
+}
+
+pub fn subvert<'a, P>(store: &'a SimpleStorage<P>, log: &'a mut Logger) -> Context<'a, P>
+where
+    P: AsRef<Path>,
+{
+    Context {
+        store: store,
+        enc: Enc::default(),
+        log: log,
+        stack: vec![],
+    }
+}
+
+pub type Stack = Vec<Triad>;
+
+pub struct Context<'a, P>
+where
+    P: AsRef<Path>,
+{
+    pub store: &'a SimpleStorage<P>,
+    pub enc: Enc,
+    pub log: &'a mut Logger,
+    pub stack: Vec<Triad>,
+}
+
+impl<'a, P> Context<'a, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn with(mut self, triads: impl IntoIterator<Item = Triad>) -> Self {
+        self.stack.extend(triads);
+        self
+    }
+
+    pub fn apply(mut self, item: impl Transform) -> Result<Self> {
+        item.transform(&mut self)?;
+        Ok(self)
+    }
+
+    pub fn parse_apply<S>(self, params: impl IntoIterator<Item = S>) -> Result<Self>
+    where
+        Self: Sized,
+        S: AsRef<str>,
+    {
+        self.apply(crate::op::parse::parse(params)?)
+    }
+
+    pub fn finish(mut self) -> Result<Triad> {
+        self.stack
+            .pop()
+            .ok_or(Error::other("No archives on the stack"))
     }
 
     pub fn read_archive(&self, t: &Triad) -> Result<Archive> {
@@ -47,48 +117,13 @@ where
     }
 }
 
-pub type Stack = Vec<Triad>;
-
-pub struct Context<'a, P>(&'a Config<'a, P>, Stack)
-where
-    P: AsRef<Path>;
-
-impl<'a, P> Context<'a, P>
-where
-    P: AsRef<Path>,
-{
-    pub fn cfg(&self) -> &Config<'a, P> {
-        self.0
-    }
-    pub fn stack(&self) -> &Stack {
-        &self.1
-    }
-    pub fn finish(mut self) -> Result<Triad> {
-        self.1.pop().ok_or(Error::other("No archives on the stack"))
-    }
-
-    pub fn parse_apply<S>(self, params: impl IntoIterator<Item = S>) -> Result<Self>
+pub trait Transform {
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
-        Self: Sized,
-        S: AsRef<str>,
-    {
-        self.apply(crate::op::parse::parse(params)?)
-    }
-}
+        P: AsRef<Path>;
 
-trait Apply<T> {
-    fn apply(self, item: T) -> Result<Self>
-    where
-        Self: Sized;
-}
-
-impl<'a, P, T> Apply<T> for Context<'a, P>
-where
-    P: AsRef<Path>,
-    T: Transform,
-{
-    fn apply(self, item: T) -> Result<Self> {
-        Ok(Self(self.0, item.transform(self.0, self.1)?))
+    fn header_name() -> &'static str {
+        "Unknown"
     }
 }
 
@@ -96,23 +131,16 @@ impl<T> Transform for T
 where
     T: IntoIterator<Item = Op>,
 {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
         for item in self {
-            stack = item.transform(cfg, stack)?;
+            item.transform(ctx)?;
         }
-        Ok(stack)
+        Ok(())
     }
 }
-
-pub trait Transform {
-    fn transform<P>(self, cfg: &Config<P>, stack: Stack) -> Result<Stack>
-    where
-        P: AsRef<Path>;
-}
-
 pub trait FromArgs {
     fn from_args<T>(args: impl IntoIterator<Item = T>) -> Result<Self>
     where
@@ -129,10 +157,8 @@ mod test {
     fn simple_ctx_example() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
         let mut log = Logger::default();
-        let cfg = Config::new(&store, &mut log);
 
-        let t: Triad = cfg
-            .ctx()
+        let t: Triad = subvert(&store, &mut log)
             .apply(&crate::op::ops::import::Import(vec!["fixture".to_owned()]))?
             .finish()?;
         assert_eq!(t, fixture_triad());
@@ -143,11 +169,10 @@ mod test {
     fn ctx_apply_op_enum() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
         let mut log = Logger::default();
-        let cfg = Config::new(&store, &mut log);
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
-        let ctx = cfg.ctx().apply(&op)?;
-        assert_eq!(ctx.stack(), &vec![fixture_triad()]);
+        let ctx = subvert(&store, &mut log).apply(&op)?;
+        assert_eq!(ctx.stack, vec![fixture_triad()]);
         Ok(())
     }
 
@@ -155,11 +180,10 @@ mod test {
     fn ctx_apply_op_seq() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
         let mut log = Logger::default();
-        let cfg = Config::new(&store, &mut log);
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
-        let ctx = cfg.ctx().apply([op.clone(), op])?;
-        assert_eq!(ctx.stack(), &vec![fixture_triad(), fixture_triad()]);
+        let ctx = subvert(&store, &mut log).apply([op.clone(), op])?;
+        assert_eq!(ctx.stack, vec![fixture_triad(), fixture_triad()]);
         Ok(())
     }
 
@@ -167,11 +191,10 @@ mod test {
     fn ctx_apply_op_parsed() -> Result<()> {
         let store = crate::storage::new_from_tempdir()?;
         let mut log = Logger::default();
-        let cfg = Config::new(&store, &mut log);
-        let ctx = cfg.ctx().parse_apply(["--import", "fixture", "fixture"])?;
-        assert_eq!(ctx.stack(), &vec![fixture_triad(), fixture_triad()]);
+        let ctx = subvert(&store, &mut log).parse_apply(["--import", "fixture", "fixture"])?;
+        assert_eq!(ctx.stack, vec![fixture_triad(), fixture_triad()]);
 
-        let ctx = cfg.ctx().parse_apply(["foo"]);
+        let ctx = subvert(&store, &mut log).parse_apply(["foo"]);
         assert!(ctx.is_err());
 
         Ok(())

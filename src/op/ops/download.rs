@@ -18,13 +18,13 @@ impl FromArgs for Download {
 }
 
 impl Transform for &Download {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
         let (given_url, expected_digest) = (&self.0, self.1);
         let filename = url_filename(given_url)?;
-        let digest = download(cfg.store, given_url)?;
+        let digest = download(ctx.store, given_url)?;
         if digest != expected_digest {
             return Err(Error::other(format!(
                 "Expected digest {:?}, got {:?}",
@@ -32,13 +32,13 @@ impl Transform for &Download {
             )));
         }
 
-        stack.push(cfg.write_archive(&vec![Entry::File {
+        ctx.stack.push(ctx.write_archive(&vec![Entry::File {
             path: ("/".to_owned() + &filename).into(),
             attrs: Attrs::new(),
             compression: Compression::Plain,
             digest: digest.clone(),
         }])?);
-        Ok(stack)
+        Ok(())
     }
 }
 
@@ -64,7 +64,6 @@ mod test {
     #[test]
     fn transform() -> Result<()> {
         let (store, mut log) = basic_kit();
-        let cfg = Config::new(&store, &mut log);
         let op = Download(
             "https://gist.githubusercontent.com/MaddieM4/92f0719922db5fbd60a12d762deca9ae/raw/37a4fe4d300b6a88913a808095fd52c1c356030a/reproducible.txt".into(),
             Digest::from("This exists for testing the pure downloads feature of Dirtabase."),
@@ -72,7 +71,7 @@ mod test {
 
         // Always creates an archive on the top of the stack.
         let [rt1, rt2] = random_triads();
-        let stack = op.transform(&cfg, vec![rt1, rt2])?;
+        let stack = subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack;
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
         assert_eq!(stack[1], rt2);
@@ -86,7 +85,7 @@ mod test {
 
         // What if we expect the wrong hash?
         let op = Download(op.0, Digest::from("Some other thing"));
-        assert!(op.transform(&cfg, vec![]).is_err());
+        assert!(subvert(&store, &mut log).apply(&op).is_err());
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 pub use crate::archive::core::Archive;
 pub use crate::op::helpers::*;
-pub use std::io::{Error, Result};
+pub use std::io::{Error, Result, Write};
 pub use std::path::Path;
 
 #[derive(Debug)]

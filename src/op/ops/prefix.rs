@@ -18,7 +18,7 @@ impl FromArgs for Prefix {
 }
 
 impl Transform for &Prefix {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
@@ -26,12 +26,13 @@ impl Transform for &Prefix {
         let replacement = fix("/", &self.1);
 
         let re = regex::Regex::new(&pattern).map_err(|e| Error::other(e))?;
-        let t = stack
+        let t = ctx
+            .stack
             .pop()
             .ok_or(Error::other("Need an archive to prefix on"))?;
-        let ar = crate::archive::api::replace(cfg.read_archive(&t)?, &re, &replacement);
-        stack.push(cfg.write_archive(&ar)?);
-        Ok(stack)
+        let ar = crate::archive::api::replace(ctx.read_archive(&t)?, &re, &replacement);
+        ctx.stack.push(ctx.write_archive(&ar)?);
+        Ok(())
     }
 }
 
@@ -54,16 +55,18 @@ mod test {
     #[test]
     fn transform() -> Result<()> {
         let (store, mut log) = basic_kit();
-        let cfg = Config::new(&store, &mut log);
         let op = Prefix("some".into(), "deep/old".into());
         let dt = crate::stream::debug::source(crate::stream::archive::sink(&store))?;
         let [rt1, rt2] = random_triads();
 
         // Zero input triads
-        assert!(op.transform(&cfg, vec![]).is_err());
+        assert!(subvert(&store, &mut log).apply(&op).is_err());
 
         // Always prefixs the top archive on the stack, ignoring lower ones
-        let stack = op.transform(&cfg, vec![rt1, rt2, dt])?;
+        let stack = subvert(&store, &mut log)
+            .with([rt1, rt2, dt])
+            .apply(&op)?
+            .stack;
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
         assert_eq!(stack[1], rt2);
@@ -80,7 +83,7 @@ mod test {
 
         // Don't replace stuff deeper into the path
         let op = Prefix("hello".into(), "goodbye".into());
-        let stack = op.transform(&cfg, vec![dt])?;
+        let stack = subvert(&store, &mut log).with([dt]).apply(&op)?.stack;
         assert_eq!(
             print_archive(&store, stack[0])?,
             indoc! {"
@@ -94,7 +97,7 @@ mod test {
 
         // It should be valid if someone includes some ^ and / in the strings
         let op = Prefix("/a".into(), "^/another".into());
-        let stack = op.transform(&cfg, vec![dt])?;
+        let stack = subvert(&store, &mut log).with([dt]).apply(&op)?.stack;
         assert_eq!(
             print_archive(&store, stack[0])?,
             indoc! {"

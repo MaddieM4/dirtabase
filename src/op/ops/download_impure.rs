@@ -16,20 +16,20 @@ impl FromArgs for DownloadImpure {
 }
 
 impl Transform for &DownloadImpure {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
         let given_url = &self.0;
         let filename = url_filename(given_url)?;
-        let digest = download(cfg.store, given_url)?;
-        stack.push(cfg.write_archive(&vec![Entry::File {
+        let digest = download(ctx.store, given_url)?;
+        ctx.stack.push(ctx.write_archive(&vec![Entry::File {
             path: ("/".to_owned() + &filename).into(),
             attrs: Attrs::new(),
             compression: Compression::Plain,
             digest: digest.clone(),
         }])?);
-        Ok(stack)
+        Ok(())
     }
 }
 
@@ -52,14 +52,13 @@ mod test {
     #[test]
     fn transform() -> Result<()> {
         let (store, mut log) = basic_kit();
-        let cfg = Config::new(&store, &mut log);
         let op = DownloadImpure(
             "https://gist.githubusercontent.com/MaddieM4/92f0719922db5fbd60a12d762deca9ae/raw/37a4fe4d300b6a88913a808095fd52c1c356030a/reproducible.txt".into(),
         );
 
         // Always creates an archive on the top of the stack.
         let [rt1, rt2] = random_triads();
-        let stack = op.transform(&cfg, vec![rt1, rt2])?;
+        let stack = subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack;
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
         assert_eq!(stack[1], rt2);

@@ -15,22 +15,23 @@ impl FromArgs for CmdImpure {
 }
 
 impl Transform for &CmdImpure {
-    fn transform<P>(self, cfg: &Config<P>, mut stack: Stack) -> Result<Stack>
+    fn transform<P>(self, ctx: &mut Context<P>) -> Result<()>
     where
         P: AsRef<Path>,
     {
         let command = &self.0;
 
         // Extract to temporary directory
-        let t = stack
+        let t = ctx
+            .stack
             .pop()
             .ok_or(Error::other("Need an archive to work on"))?;
         let dir = tempfile::tempdir()?;
-        crate::stream::archive::source(cfg.store, t, crate::stream::osdir::sink(&dir))?;
+        crate::stream::archive::source(ctx.store, t, crate::stream::osdir::sink(&dir))?;
 
         // Run the command
         // Equivalent to: bash -o pipefail -e -c '...'
-        println!("--- [{}] ---", command);
+        write!(ctx.log.cmd(), "--- [{}] ---\n", command)?;
         let status = Command::new("bash")
             .arg("-o")
             .arg("pipefail")
@@ -49,9 +50,9 @@ impl Transform for &CmdImpure {
         }
 
         // Re-import directory back into a new stored archive
-        let reimport = crate::stream::osdir::source(&dir, crate::stream::archive::sink(cfg.store))?;
-        stack.push(reimport);
-        Ok(stack)
+        let reimport = crate::stream::osdir::source(&dir, crate::stream::archive::sink(ctx.store))?;
+        ctx.stack.push(reimport);
+        Ok(())
     }
 }
 
@@ -71,13 +72,12 @@ mod test {
     #[test]
     fn transform() -> Result<()> {
         let (store, mut log) = basic_kit();
-        let cfg = Config::new(&store, &mut log);
         let op = CmdImpure("touch grass".into());
 
         // Let's see it work!
         let sink = crate::stream::archive::sink(&store);
         let dt = crate::stream::debug::source(sink)?;
-        let stack = op.transform(&cfg, vec![dt])?;
+        let stack = subvert(&store, &mut log).with([dt]).apply(&op)?.stack;
         assert_eq!(
             print_archive(&store, stack[0])?,
             indoc! {"
@@ -94,7 +94,7 @@ mod test {
 
         // But does it catch failure? Especially in pipelines?
         let op = CmdImpure("echo hello | exit 60".into());
-        assert!(op.transform(&cfg, vec![dt]).is_err());
+        assert!(subvert(&store, &mut log).with([dt]).apply(&op).is_err());
 
         Ok(())
     }
