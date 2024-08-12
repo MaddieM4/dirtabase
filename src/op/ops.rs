@@ -15,7 +15,9 @@
 //!  - prefix
 //!  - download
 //!  - download_impure
+//!  - cmd_impure
 
+pub mod cmd_impure;
 pub mod download;
 pub mod download_impure;
 pub mod empty;
@@ -25,6 +27,5 @@ pub mod import;
 pub mod merge;
 pub mod prefix;
 pub mod replace;
-// pub mod cmd_impure;
 
 mod prelude;

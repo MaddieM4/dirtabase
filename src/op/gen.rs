@@ -15,6 +15,7 @@ pub enum OpCode {
     Prefix,
     Download,
     DownloadImpure,
+    CmdImpure,
 }
 
 pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
@@ -28,6 +29,7 @@ pub fn to_opcode(arg: impl AsRef<str>) -> Option<OpCode> {
         "--prefix" => Some(OpCode::Prefix),
         "--download" => Some(OpCode::Download),
         "--download-impure" => Some(OpCode::DownloadImpure),
+        "--cmd-impure" => Some(OpCode::CmdImpure),
         _ => None,
     }
 }
@@ -43,6 +45,7 @@ pub enum Op {
     Prefix(x::prefix::Prefix),
     Download(x::download::Download),
     DownloadImpure(x::download_impure::DownloadImpure),
+    CmdImpure(x::cmd_impure::CmdImpure),
 }
 
 impl Op {
@@ -58,6 +61,7 @@ impl Op {
             OpCode::Prefix => Op::Prefix(x::prefix::Prefix::from_args(params)?),
             OpCode::Download => Op::Download(x::download::Download::from_args(params)?),
             OpCode::DownloadImpure => Op::DownloadImpure(x::download_impure::DownloadImpure::from_args(params)?),
+            OpCode::CmdImpure => Op::CmdImpure(x::cmd_impure::CmdImpure::from_args(params)?),
         })
     }
 }
@@ -77,6 +81,7 @@ impl Transform for &Op {
             Op::Prefix(t) => t.transform(cfg, stack),
             Op::Download(t) => t.transform(cfg, stack),
             Op::DownloadImpure(t) => t.transform(cfg, stack),
+            Op::CmdImpure(t) => t.transform(cfg, stack),
         }
     }
 }
