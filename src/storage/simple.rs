@@ -21,9 +21,9 @@
 //!
 //! ```
 //! use dirtabase::digest::Digest;
-//! use dirtabase::storage;
+//! use dirtabase::storage::Store;
 //!
-//! let store = storage::new_from_tempdir()?;
+//! let store = Store::new_simpletemp()?;
 //! let digest = store.cas().write_buf("foo")?;
 //!
 //! assert_eq!(digest.to_hex(), Digest::from("foo").to_hex());
@@ -38,26 +38,42 @@ use std::io::{self, Cursor, Write};
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 
-/// Implementation of the simple storage backend.
-pub struct SimpleStorage<P>(P, SimpleCAS, SimpleLabels)
-where
-    P: AsRef<Path>;
-impl<P> SimpleStorage<P>
-where
-    P: AsRef<Path>,
-{
-    /// Create a simple storage backend.
-    pub fn new(path: P) -> io::Result<Self> {
-        let cas = SimpleCAS::new(path.as_ref().join("cas"))?;
-        let labels = SimpleLabels::new(path.as_ref().join("labels"))?;
-        Ok(Self(path, cas, labels))
+/// All supported storage backends.
+pub enum Store {
+    /// Behaves persistently, does not auto-delete itself when dropped.
+    Simple(PathBuf, SimpleCAS, SimpleLabels),
+
+    /// Deletes itself from disk when it goes out of lexical scope.
+    SimpleTemp(tempfile::TempDir, SimpleCAS, SimpleLabels),
+}
+
+impl Store {
+    pub fn new_simple(path: impl AsRef<Path>) -> io::Result<Self> {
+        let path: PathBuf = path.as_ref().into();
+        let cas = SimpleCAS::new(path.join("cas"))?;
+        let labels = SimpleLabels::new(path.join("labels"))?;
+        Ok(Self::Simple(path, cas, labels))
+    }
+
+    pub fn new_simpletemp() -> io::Result<Self> {
+        let dir = tempfile::tempdir()?;
+        let cas = SimpleCAS::new(dir.path().join("cas"))?;
+        let labels = SimpleLabels::new(dir.path().join("labels"))?;
+        Ok(Self::SimpleTemp(dir, cas, labels))
     }
 
     pub fn cas(&self) -> &SimpleCAS {
-        &self.1
+        match self {
+            Self::Simple(_, cas, _) => &cas,
+            Self::SimpleTemp(_, cas, _) => &cas,
+        }
     }
+
     pub fn labels(&self) -> &SimpleLabels {
-        &self.2
+        match self {
+            Self::Simple(_, _, labels) => &labels,
+            Self::SimpleTemp(_, _, labels) => &labels,
+        }
     }
 }
 
@@ -153,14 +169,17 @@ impl SimpleLabels {
 mod test {
     use super::*;
     use std::io::Read;
-    use tempfile::tempdir;
 
     #[test]
     fn cas_read() -> io::Result<()> {
-        let dir = tempdir()?;
-        let store = SimpleStorage::new(&dir)?;
+        let store = Store::new_simpletemp()?;
         let d: Digest = "some text".into();
-        let path = dir.path().join("cas").join(d.to_hex());
+        let path = match store {
+            Store::SimpleTemp(ref dir, _, _) => dir.path(),
+            _ => unreachable!(),
+        }
+        .join("cas")
+        .join(d.to_hex());
 
         // No cas file, treated as no IO error but option is None
         assert!(store.cas().read(&d)?.is_none());
@@ -180,11 +199,15 @@ mod test {
 
     #[test]
     fn cas_write() -> io::Result<()> {
-        let dir = tempdir()?;
-        let store = SimpleStorage::new(&dir)?;
+        let store = Store::new_simpletemp()?;
         let contents = "some text";
         let d: Digest = contents.into();
-        let path = dir.path().join("cas").join(d.to_hex());
+        let path = match store {
+            Store::SimpleTemp(ref dir, _, _) => dir.path(),
+            _ => unreachable!(),
+        }
+        .join("cas")
+        .join(d.to_hex());
 
         // No cas file yet
         assert!(!path.exists());
@@ -201,10 +224,13 @@ mod test {
 
     #[test]
     fn lab_read() -> io::Result<()> {
-        let dir = tempdir()?;
-        let store = SimpleStorage::new(&dir)?;
+        let store = Store::new_simpletemp()?;
         let lab = Label::new("@foo").unwrap();
-        let path = dir.path().join("labels/@foo");
+        let path = match store {
+            Store::SimpleTemp(ref dir, _, _) => dir.path(),
+            _ => unreachable!(),
+        }
+        .join("labels/@foo");
 
         // No label file but not an error, represented as empty array
         assert_eq!(store.labels().read(&lab)?, vec![0; 0]);
@@ -218,10 +244,13 @@ mod test {
 
     #[test]
     fn lab_write() -> io::Result<()> {
-        let dir = tempdir()?;
-        let store = SimpleStorage::new(&dir)?;
+        let store = Store::new_simpletemp()?;
         let lab = Label::new("@foo").unwrap();
-        let path = dir.path().join("labels/@foo");
+        let path = match store {
+            Store::SimpleTemp(ref dir, _, _) => dir.path(),
+            _ => unreachable!(),
+        }
+        .join("labels/@foo");
 
         // Prior to write, file doesn't exist
         assert!(!path.exists());

@@ -86,7 +86,7 @@ pub fn execute(behavior: Behavior, log: &mut Logger) -> ExitCode {
 }
 
 fn execute_pipeline(steps: Vec<String>, log: &mut Logger) -> std::io::Result<()> {
-    let store = crate::storage::new("./.dirtabase_db")?;
+    let store = crate::storage::Store::new_simple("./.dirtabase_db")?;
     ctx(&store, log).parse_apply(steps)?;
     Ok(())
 }

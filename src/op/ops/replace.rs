@@ -14,10 +14,7 @@ impl FromArgs for Replace {
 }
 
 impl Transform for &Replace {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let re = regex::Regex::new(&self.0).map_err(|e| Error::other(e))?;
         let replacement = &self.1;
         let t = ctx
@@ -30,10 +27,7 @@ impl Transform for &Replace {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn replace(self, pattern: &str, replacement: &str) -> Result<Self> {
         write!(self.log.opheader(), "--- Replace ---\n")?;
         self.apply(&Replace(pattern.into(), replacement.into()))

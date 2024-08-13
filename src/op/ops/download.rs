@@ -18,10 +18,7 @@ impl FromArgs for Download {
 }
 
 impl Transform for &Download {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let (given_url, expected_digest) = (&self.0, self.1);
         let filename = url_filename(given_url)?;
         let digest = download(ctx.store, given_url)?;
@@ -42,10 +39,7 @@ impl Transform for &Download {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn download(self, url: &str, hex: &str) -> Result<Self> {
         write!(self.log.opheader(), "--- Download ---\n")?;
         let digest = Digest::from_hex(hex).map_err(|e| Error::other(e))?;

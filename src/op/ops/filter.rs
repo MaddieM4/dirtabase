@@ -14,10 +14,7 @@ impl FromArgs for Filter {
 }
 
 impl Transform for &Filter {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let re = regex::Regex::new(&self.0).map_err(|e| Error::other(e))?;
         let t = ctx
             .stack
@@ -29,10 +26,7 @@ impl Transform for &Filter {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn filter(self, pattern: &str) -> Result<Self> {
         write!(self.log.opheader(), "--- Filter ---\n")?;
         self.apply(&Filter(pattern.into()))

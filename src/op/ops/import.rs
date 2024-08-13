@@ -15,10 +15,7 @@ impl FromArgs for Import {
 }
 
 impl Transform for &Import {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         for path in &self.0 {
             let sink = crate::stream::archive::sink(ctx.store);
             ctx.stack.push(crate::stream::osdir::source(path, sink)?);
@@ -27,10 +24,7 @@ impl Transform for &Import {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn import<T>(self, args: impl IntoIterator<Item = T>) -> Result<Self>
     where
         T: AsRef<str>,

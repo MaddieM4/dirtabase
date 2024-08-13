@@ -15,10 +15,7 @@ impl FromArgs for Export {
 }
 
 impl Transform for &Export {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let params = &self.0;
         if params.len() > ctx.stack.len() {
             return Err(Error::other(format!(
@@ -38,10 +35,7 @@ impl Transform for &Export {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn export<T>(self, args: impl IntoIterator<Item = T>) -> Result<Self>
     where
         T: AsRef<str>,

@@ -16,10 +16,7 @@ impl FromArgs for DownloadImpure {
 }
 
 impl Transform for &DownloadImpure {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let given_url = &self.0;
         let filename = url_filename(given_url)?;
         let digest = download(ctx.store, given_url)?;
@@ -33,10 +30,7 @@ impl Transform for &DownloadImpure {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn download_impure(self, url: &str) -> Result<Self> {
         write!(self.log.opheader(), "--- DownloadImpure ---\n")?;
         self.apply(&DownloadImpure(url.into()))

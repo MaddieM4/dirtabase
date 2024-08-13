@@ -1,6 +1,6 @@
 use crate::archive::core::*;
 use crate::archive::normalize::normalize;
-use crate::storage::simple::SimpleStorage;
+use crate::storage::Store;
 use regex::Regex;
 use std::io::{Cursor, Read as _, Result};
 
@@ -14,15 +14,12 @@ pub fn archive_decode(bytes: Vec<u8>, _f: ArchiveFormat, _c: Compression) -> Res
     serde_json::from_slice(bytes.as_ref()).map_err(|e| std::io::Error::other(e))
 }
 
-pub fn write_archive<P>(
+pub fn write_archive(
     ar: &Archive,
     f: ArchiveFormat,
     c: Compression,
-    store: &SimpleStorage<P>,
-) -> Result<Digest>
-where
-    P: AsRef<std::path::Path>,
-{
+    store: &Store,
+) -> Result<Digest> {
     // Turn `ar` into `bytes: Vec<u8>`
     let bytes = archive_encode(ar, f, c)?;
 
@@ -33,15 +30,12 @@ where
     store.cas().write(curs)
 }
 
-pub fn read_archive<P>(
+pub fn read_archive(
     f: ArchiveFormat,
     c: Compression,
     digest: &Digest,
-    store: &SimpleStorage<P>,
-) -> Result<Archive>
-where
-    P: AsRef<std::path::Path>,
-{
+    store: &Store,
+) -> Result<Archive> {
     let mut bytes: Vec<u8> = vec![];
     store
         .cas()

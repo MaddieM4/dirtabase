@@ -1,7 +1,6 @@
 pub use crate::archive::core::Archive;
 pub use crate::op::helpers::*;
 pub use std::io::{Error, Result, Write};
-pub use std::path::Path;
 
 #[derive(Debug)]
 pub struct UnpackError<const N: usize> {
@@ -47,13 +46,7 @@ where
     }
 }
 
-pub fn download<P>(
-    store: &crate::storage::simple::SimpleStorage<P>,
-    url: &str,
-) -> Result<crate::digest::Digest>
-where
-    P: AsRef<Path>,
-{
+pub fn download(store: &crate::storage::Store, url: &str) -> Result<crate::digest::Digest> {
     let response = reqwest::blocking::get(url).map_err(|e| Error::other(e))?;
     let digest = store.cas().write(response)?;
     print!(">> Downloaded {}\n>> Digest: {}\n", url, digest.to_hex());

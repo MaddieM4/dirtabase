@@ -3,10 +3,10 @@
 //! ```
 //! use indoc::indoc;
 //! use tempfile::tempdir;
-//! use dirtabase::storage;
+//! use dirtabase::storage::Store;
 //! use dirtabase::stream::{debug,archive};
 //!
-//! let store = storage::new_from_tempdir()?;
+//! let store = Store::new_simpletemp()?;
 //!
 //! // The triad is a reference to where an archive was stored within a store
 //! let triad = debug::source(archive::sink(&store))?;
@@ -31,7 +31,7 @@
 
 use crate::archive::api::*;
 use crate::archive::core::*;
-use crate::storage::simple::SimpleStorage;
+use crate::storage::Store;
 use crate::stream::core::Sink;
 use std::io::{Cursor, Error, ErrorKind, Read, Result};
 
@@ -40,10 +40,7 @@ use std::io::{Cursor, Error, ErrorKind, Read, Result};
 /// This requires already having a store. It will save files into the store as
 /// you submit them. The Archive itself is serialized and saved to store at the
 /// end, which is the Triad returned by .finalize().
-pub fn sink<'a, P>(store: &'a SimpleStorage<P>) -> ArchiveSink<'a, P>
-where
-    P: AsRef<std::path::Path>,
-{
+pub fn sink<'a>(store: &'a Store) -> ArchiveSink<'a> {
     ArchiveSink {
         store: store,
         archive: vec![],
@@ -53,20 +50,14 @@ where
 }
 
 /// Implementation of sink(&store).
-pub struct ArchiveSink<'a, P>
-where
-    P: AsRef<std::path::Path>,
-{
-    store: &'a SimpleStorage<P>,
+pub struct ArchiveSink<'a> {
+    store: &'a Store,
     archive: Archive,
     format: ArchiveFormat,
     compression: Compression,
 }
 
-impl<P> Sink for ArchiveSink<'_, P>
-where
-    P: AsRef<std::path::Path>,
-{
+impl Sink for ArchiveSink<'_> {
     type Receipt = Triad;
 
     fn send_dir(mut self, path: impl AsRef<Path>, attrs: Attrs) -> Result<Self> {
@@ -106,10 +97,9 @@ where
 /// This requires you to have a store, but also a Triad to say which archive
 /// within that store you want to read. Because of the Stream API this works
 /// by driving some kind of Sink.
-pub fn source<S, P>(store: &SimpleStorage<P>, triad: Triad, mut sink: S) -> Result<S::Receipt>
+pub fn source<S>(store: &Store, triad: Triad, mut sink: S) -> Result<S::Receipt>
 where
     S: Sink,
-    P: AsRef<std::path::Path>,
 {
     let (f, c, d) = (triad.0, triad.1, triad.2);
     let f = match f {
@@ -161,10 +151,9 @@ mod test {
 
     #[test]
     fn round_trip() -> Result<()> {
-        use crate::storage;
         use crate::stream::debug;
 
-        let store = storage::new_from_tempdir()?;
+        let store = Store::new_simpletemp()?;
         let arc_sink = sink(&store);
         let triad = debug::source(arc_sink)?;
 

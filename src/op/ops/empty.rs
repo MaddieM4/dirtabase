@@ -14,19 +14,13 @@ impl FromArgs for Empty {
 }
 
 impl Transform for &Empty {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         ctx.stack.push(ctx.write_archive(&vec![])?);
         Ok(())
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn empty(self) -> Result<Self> {
         write!(self.log.opheader(), "--- Empty ---\n")?;
         self.apply(&Empty)

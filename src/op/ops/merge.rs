@@ -14,10 +14,7 @@ impl FromArgs for Merge {
 }
 
 impl Transform for &Merge {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let ars: Vec<Archive> = ctx
             .stack
             .iter()
@@ -29,10 +26,7 @@ impl Transform for &Merge {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn merge(self) -> Result<Self> {
         write!(self.log.opheader(), "--- Merge ---\n")?;
         self.apply(&Merge)

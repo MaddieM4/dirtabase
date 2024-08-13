@@ -15,10 +15,7 @@ impl FromArgs for CmdImpure {
 }
 
 impl Transform for &CmdImpure {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let command = &self.0;
 
         // Extract to temporary directory
@@ -56,10 +53,7 @@ impl Transform for &CmdImpure {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn cmd_impure(self, cmd: &str) -> Result<Self> {
         write!(self.log.opheader(), "--- CmdImpure ---\n")?;
         self.apply(&CmdImpure(cmd.into()))

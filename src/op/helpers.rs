@@ -2,14 +2,19 @@ use crate::archive::core::{Archive, Triad, TriadFormat};
 use crate::enc::Settings as Enc;
 use crate::logger::Logger;
 use crate::op::gen::Op;
-use crate::storage::simple::SimpleStorage;
+use crate::storage::Store;
 use std::io::{Error, Result, Write};
-use std::path::Path;
 
-pub fn ctx<'a, P>(store: &'a SimpleStorage<P>, log: &'a mut Logger) -> Context<'a, P>
-where
-    P: AsRef<Path>,
-{
+pub type Stack = Vec<Triad>;
+
+pub struct Context<'a> {
+    pub store: &'a Store,
+    pub enc: Enc,
+    pub log: &'a mut Logger,
+    pub stack: Vec<Triad>,
+}
+
+pub fn ctx<'a>(store: &'a Store, log: &'a mut Logger) -> Context<'a> {
     Context {
         store: store,
         enc: Enc::default(),
@@ -18,22 +23,7 @@ where
     }
 }
 
-pub type Stack = Vec<Triad>;
-
-pub struct Context<'a, P>
-where
-    P: AsRef<Path>,
-{
-    pub store: &'a SimpleStorage<P>,
-    pub enc: Enc,
-    pub log: &'a mut Logger,
-    pub stack: Vec<Triad>,
-}
-
-impl<'a, P> Context<'a, P>
-where
-    P: AsRef<Path>,
-{
+impl<'a> Context<'a> {
     pub fn with(mut self, triads: impl IntoIterator<Item = Triad>) -> Self {
         self.stack.extend(triads);
         self
@@ -75,9 +65,7 @@ where
 }
 
 pub trait Transform {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>;
+    fn transform(&self, ctx: &mut Context) -> Result<()>;
 
     fn header_name(&self) -> &'static str {
         "Unknown"
@@ -85,10 +73,7 @@ pub trait Transform {
 }
 
 impl<const N: usize> Transform for [Op; N] {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         for item in self {
             write!(ctx.log.opheader(), "--- {} ---\n", item.header_name())?;
             item.transform(ctx)?;
@@ -98,10 +83,7 @@ impl<const N: usize> Transform for [Op; N] {
 }
 
 impl Transform for Vec<Op> {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         for item in self {
             write!(ctx.log.opheader(), "--- {} ---\n", item.header_name())?;
             item.transform(ctx)?;
@@ -127,7 +109,7 @@ mod test {
 
     #[test]
     fn simple_ctx_example() -> Result<()> {
-        let store = crate::storage::new_from_tempdir()?;
+        let store = Store::new_simpletemp()?;
         let mut log = crate::logger::vec_logger();
 
         let t: Triad = ctx(&store, &mut log)
@@ -139,7 +121,7 @@ mod test {
 
     #[test]
     fn ctx_apply_op_enum() -> Result<()> {
-        let store = crate::storage::new_from_tempdir()?;
+        let store = Store::new_simpletemp()?;
         let mut log = crate::logger::vec_logger();
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
@@ -150,7 +132,7 @@ mod test {
 
     #[test]
     fn ctx_apply_op_seq() -> Result<()> {
-        let store = crate::storage::new_from_tempdir()?;
+        let store = Store::new_simpletemp()?;
         let mut log = crate::logger::vec_logger();
         let op = Op::Import(crate::op::ops::import::Import(vec!["fixture".to_owned()]));
 
@@ -161,7 +143,7 @@ mod test {
 
     #[test]
     fn ctx_apply_op_parsed() -> Result<()> {
-        let store = crate::storage::new_from_tempdir()?;
+        let store = Store::new_simpletemp()?;
         let mut log = crate::logger::vec_logger();
         let c = ctx(&store, &mut log).parse_apply(["--import", "fixture", "fixture"])?;
         assert_eq!(c.stack, vec![fixture_triad(), fixture_triad()]);

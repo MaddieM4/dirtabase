@@ -2,7 +2,6 @@
 use crate::op::helpers::{Context, FromArgs, Transform};
 use crate::op::ops as x;
 use std::io::Result;
-use std::path::Path;
 
 #[derive(Debug, PartialEq)]
 pub enum OpCode {
@@ -67,10 +66,7 @@ impl Op {
 }
 
 impl Transform for Op {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         match self {
             Op::Empty(t) => t.transform(ctx),
             Op::Import(t) => t.transform(ctx),

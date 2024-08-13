@@ -18,10 +18,7 @@ impl FromArgs for Prefix {
 }
 
 impl Transform for &Prefix {
-    fn transform<P>(&self, ctx: &mut Context<P>) -> Result<()>
-    where
-        P: AsRef<Path>,
-    {
+    fn transform(&self, ctx: &mut Context) -> Result<()> {
         let pattern = fix("^/", &self.0);
         let replacement = fix("/", &self.1);
 
@@ -36,10 +33,7 @@ impl Transform for &Prefix {
     }
 }
 
-impl<P> crate::op::helpers::Context<'_, P>
-where
-    P: AsRef<Path>,
-{
+impl Context<'_> {
     pub fn prefix(self, pattern: &str, replacement: &str) -> Result<Self> {
         write!(self.log.opheader(), "--- Prefix ---\n")?;
         self.apply(&Prefix(pattern.into(), replacement.into()))
