@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod ark;
 pub mod attr;
 pub mod digest;
 pub mod enc;
