@@ -99,7 +99,7 @@ impl Logger {
         }
     }
 
-    fn lw_for(&mut self, pol: Policy) -> &mut WriteBackend {
+    fn wb_for(&mut self, pol: Policy) -> &mut WriteBackend {
         match pol {
             Policy::Stdout => &mut self.stdout,
             Policy::Stderr => &mut self.stderr,
@@ -108,13 +108,13 @@ impl Logger {
     }
 
     pub fn opheader(&mut self) -> &mut WriteBackend {
-        self.lw_for(self.pol.opheader)
+        self.wb_for(self.pol.opheader)
     }
     pub fn stack(&mut self) -> &mut WriteBackend {
-        self.lw_for(self.pol.stack)
+        self.wb_for(self.pol.stack)
     }
     pub fn cmd(&mut self) -> &mut WriteBackend {
-        self.lw_for(self.pol.cmd)
+        self.wb_for(self.pol.cmd)
     }
 }
 
@@ -146,7 +146,7 @@ mod test {
     }
 
     #[test]
-    fn test_lwstderr() -> Result<()> {
+    fn test_stderr() -> Result<()> {
         let mut log = vec_logger();
         write!(log.stderr, "Writing to {}...", "stderr")?;
         assert_eq!(log.stdout.recorded().unwrap(), "");
