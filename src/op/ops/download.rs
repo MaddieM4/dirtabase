@@ -42,6 +42,17 @@ impl Transform for &Download {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn download(self, url: &str, hex: &str) -> Result<Self> {
+        write!(self.log.opheader(), "--- Download ---\n")?;
+        let digest = Digest::from_hex(hex).map_err(|e| Error::other(e))?;
+        self.apply(&Download(url.to_owned(), digest))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -71,7 +82,7 @@ mod test {
 
         // Always creates an archive on the top of the stack.
         let [rt1, rt2] = random_triads();
-        let stack = subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack;
+        let stack = ctx(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack;
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
         assert_eq!(stack[1], rt2);
@@ -85,8 +96,26 @@ mod test {
 
         // What if we expect the wrong hash?
         let op = Download(op.0, Digest::from("Some other thing"));
-        assert!(subvert(&store, &mut log).apply(&op).is_err());
+        assert!(ctx(&store, &mut log).apply(&op).is_err());
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let d = Digest::from("This exists for testing the pure downloads feature of Dirtabase.");
+        let triad = ctx(&store, &mut log).download(
+            "https://gist.githubusercontent.com/MaddieM4/92f0719922db5fbd60a12d762deca9ae/raw/37a4fe4d300b6a88913a808095fd52c1c356030a/reproducible.txt",
+            &d.to_hex(),
+        )?.finish()?;
+        assert_eq!(
+            print_archive(&store, triad)?,
+            indoc! {"
+          FILE /reproducible.txt
+            Length: 64
+        "}
+        );
         Ok(())
     }
 }

@@ -56,6 +56,16 @@ impl Transform for &CmdImpure {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn cmd_impure(self, cmd: &str) -> Result<Self> {
+        write!(self.log.opheader(), "--- CmdImpure ---\n")?;
+        self.apply(&CmdImpure(cmd.into()))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -77,7 +87,7 @@ mod test {
         // Let's see it work!
         let sink = crate::stream::archive::sink(&store);
         let dt = crate::stream::debug::source(sink)?;
-        let stack = subvert(&store, &mut log).with([dt]).apply(&op)?.stack;
+        let stack = ctx(&store, &mut log).with([dt]).apply(&op)?.stack;
         assert_eq!(
             print_archive(&store, stack[0])?,
             indoc! {"
@@ -94,8 +104,33 @@ mod test {
 
         // But does it catch failure? Especially in pipelines?
         let op = CmdImpure("echo hello | exit 60".into());
-        assert!(subvert(&store, &mut log).with([dt]).apply(&op).is_err());
+        assert!(ctx(&store, &mut log).with([dt]).apply(&op).is_err());
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let sink = crate::stream::archive::sink(&store);
+        let dt = crate::stream::debug::source(sink)?;
+        let triad = ctx(&store, &mut log)
+            .with([dt])
+            .cmd_impure("touch grass")?
+            .finish()?;
+        assert_eq!(
+            print_archive(&store, triad)?,
+            indoc! {"
+              FILE /some/dir/hello.txt
+                Length: 17
+              FILE /grass
+                Length: 0
+              DIR /some/dir
+              DIR /some
+              DIR /a/directory
+              DIR /a
+            "}
+        );
         Ok(())
     }
 }

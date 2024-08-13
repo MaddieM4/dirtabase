@@ -36,6 +36,16 @@ impl Transform for &Prefix {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn prefix(self, pattern: &str, replacement: &str) -> Result<Self> {
+        write!(self.log.opheader(), "--- Prefix ---\n")?;
+        self.apply(&Prefix(pattern.into(), replacement.into()))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -60,13 +70,10 @@ mod test {
         let [rt1, rt2] = random_triads();
 
         // Zero input triads
-        assert!(subvert(&store, &mut log).apply(&op).is_err());
+        assert!(ctx(&store, &mut log).apply(&op).is_err());
 
         // Always prefixs the top archive on the stack, ignoring lower ones
-        let stack = subvert(&store, &mut log)
-            .with([rt1, rt2, dt])
-            .apply(&op)?
-            .stack;
+        let stack = ctx(&store, &mut log).with([rt1, rt2, dt]).apply(&op)?.stack;
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
         assert_eq!(stack[1], rt2);
@@ -83,7 +90,7 @@ mod test {
 
         // Don't replace stuff deeper into the path
         let op = Prefix("hello".into(), "goodbye".into());
-        let stack = subvert(&store, &mut log).with([dt]).apply(&op)?.stack;
+        let stack = ctx(&store, &mut log).with([dt]).apply(&op)?.stack;
         assert_eq!(
             print_archive(&store, stack[0])?,
             indoc! {"
@@ -97,7 +104,7 @@ mod test {
 
         // It should be valid if someone includes some ^ and / in the strings
         let op = Prefix("/a".into(), "^/another".into());
-        let stack = subvert(&store, &mut log).with([dt]).apply(&op)?.stack;
+        let stack = ctx(&store, &mut log).with([dt]).apply(&op)?.stack;
         assert_eq!(
             print_archive(&store, stack[0])?,
             indoc! {"
@@ -109,6 +116,28 @@ mod test {
         "}
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let sink = crate::stream::archive::sink(&store);
+        let dt = crate::stream::debug::source(sink)?;
+        let triad = ctx(&store, &mut log)
+            .with([dt])
+            .prefix("/a", "^/another")?
+            .finish()?;
+        assert_eq!(
+            print_archive(&store, triad)?,
+            indoc! {"
+          FILE /some/dir/hello.txt
+            Length: 17
+            AnotherAttr: for example purposes
+          DIR /another/directory
+            Foo: Bar
+          "}
+        );
         Ok(())
     }
 }

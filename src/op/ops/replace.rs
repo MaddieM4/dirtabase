@@ -30,6 +30,16 @@ impl Transform for &Replace {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn replace(self, pattern: &str, replacement: &str) -> Result<Self> {
+        write!(self.log.opheader(), "--- Replace ---\n")?;
+        self.apply(&Replace(pattern.into(), replacement.into()))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -52,15 +62,12 @@ mod test {
         let op = Replace("hello".into(), "goodbye".into());
 
         // Zero input triads
-        assert!(subvert(&store, &mut log).apply(&op).is_err());
+        assert!(ctx(&store, &mut log).apply(&op).is_err());
 
         // Always replaces the top archive on the stack, ignoring lower ones
         let dt = crate::stream::debug::source(crate::stream::archive::sink(&store))?;
         let [rt1, rt2] = random_triads();
-        let stack = subvert(&store, &mut log)
-            .with([rt1, rt2, dt])
-            .apply(&op)?
-            .stack;
+        let stack = ctx(&store, &mut log).with([rt1, rt2, dt]).apply(&op)?.stack;
 
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
@@ -79,6 +86,28 @@ mod test {
             "}
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let sink = crate::stream::archive::sink(&store);
+        let dt = crate::stream::debug::source(sink)?;
+        let triad = ctx(&store, &mut log)
+            .with([dt])
+            .replace("hello", "goodbye")?
+            .finish()?;
+        assert_eq!(
+            print_archive(&store, triad)?,
+            indoc! {"
+              FILE /some/dir/goodbye.txt
+                Length: 17
+                AnotherAttr: for example purposes
+              DIR /a/directory
+                Foo: Bar
+            "}
+        );
         Ok(())
     }
 }

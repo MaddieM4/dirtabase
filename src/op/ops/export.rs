@@ -38,6 +38,19 @@ impl Transform for &Export {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn export<T>(self, args: impl IntoIterator<Item = T>) -> Result<Self>
+    where
+        T: AsRef<str>,
+    {
+        write!(self.log.opheader(), "--- Export ---\n")?;
+        self.apply(&Export::from_args(args)?)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -62,23 +75,35 @@ mod test {
 
         // Zero arguments
         let op = Export::from_args([] as [&str; 0])?;
-        assert_eq!(subvert(&store, &mut log).apply(&op)?.stack, vec![]);
+        assert_eq!(ctx(&store, &mut log).apply(&op)?.stack, vec![]);
         assert_eq!(
-            subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
+            ctx(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
             vec![rt1, rt2]
         );
 
         // One argument, zero stack - should fail
         let op = Export::from_args([out.path().to_string_lossy()])?;
-        assert!(subvert(&store, &mut log).apply(&op).is_err());
+        assert!(ctx(&store, &mut log).apply(&op).is_err());
 
         // One argument, one stack
+        assert_eq!(ctx(&store, &mut log).with([dt]).apply(&op)?.stack, vec![]);
+        assert!(out.path().join("some/dir/hello.txt").exists());
+
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let dt = crate::stream::debug::source(crate::stream::archive::sink(&store))?;
+        let out = tempfile::tempdir()?;
+        let path = out.path().to_string_lossy();
+
         assert_eq!(
-            subvert(&store, &mut log).with([dt]).apply(&op)?.stack,
+            ctx(&store, &mut log).with([dt]).export([path])?.stack,
             vec![]
         );
         assert!(out.path().join("some/dir/hello.txt").exists());
-
         Ok(())
     }
 }

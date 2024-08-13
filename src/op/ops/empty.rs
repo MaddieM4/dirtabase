@@ -23,6 +23,16 @@ impl Transform for &Empty {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn empty(self) -> Result<Self> {
+        write!(self.log.opheader(), "--- Empty ---\n")?;
+        self.apply(&Empty)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -42,20 +52,24 @@ mod test {
         let [rt1, rt2, rt3] = random_triads();
 
         // Zero input triads
-        assert_eq!(
-            subvert(&store, &mut log).apply(&op)?.stack,
-            vec![empty_triad()]
-        );
+        assert_eq!(ctx(&store, &mut log).apply(&op)?.stack, vec![empty_triad()]);
 
         // Always appends
         assert_eq!(
-            subvert(&store, &mut log)
+            ctx(&store, &mut log)
                 .with([rt1, rt2, rt3])
                 .apply(&op)?
                 .stack,
             vec![rt1, rt2, rt3, empty_triad()]
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        assert_eq!(ctx(&store, &mut log).empty()?.stack, vec![empty_triad()]);
         Ok(())
     }
 }

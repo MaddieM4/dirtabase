@@ -29,6 +29,16 @@ impl Transform for &Merge {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn merge(self) -> Result<Self> {
+        write!(self.log.opheader(), "--- Merge ---\n")?;
+        self.apply(&Merge)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -50,14 +60,11 @@ mod test {
             crate::stream::osdir::source("fixture", crate::stream::archive::sink(&store))?;
 
         // Zero input triads
-        assert_eq!(
-            subvert(&store, &mut log).apply(&op)?.stack,
-            vec![empty_triad()]
-        );
+        assert_eq!(ctx(&store, &mut log).apply(&op)?.stack, vec![empty_triad()]);
 
         // Smush down multiple identical triads
         assert_eq!(
-            subvert(&store, &mut log)
+            ctx(&store, &mut log)
                 .with([f, f, f, f, f])
                 .apply(&op)?
                 .stack,
@@ -66,16 +73,28 @@ mod test {
 
         // Fixture plus empties is also still fixture
         assert_eq!(
-            subvert(&store, &mut log).with([e, f, e]).apply(&op)?.stack,
+            ctx(&store, &mut log).with([e, f, e]).apply(&op)?.stack,
             vec![f]
         );
 
         // Random triads can't be found for reading
-        assert!(subvert(&store, &mut log)
+        assert!(ctx(&store, &mut log)
             .with([random_triad(), random_triad()])
             .apply(&op)
             .is_err());
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let f: Triad =
+            crate::stream::osdir::source("fixture", crate::stream::archive::sink(&store))?;
+        assert_eq!(
+            ctx(&store, &mut log).with([f]).empty()?.merge()?.stack,
+            vec![f]
+        );
         Ok(())
     }
 }

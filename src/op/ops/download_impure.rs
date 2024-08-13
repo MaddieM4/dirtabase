@@ -33,6 +33,16 @@ impl Transform for &DownloadImpure {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn download_impure(self, url: &str) -> Result<Self> {
+        write!(self.log.opheader(), "--- DownloadImpure ---\n")?;
+        self.apply(&DownloadImpure(url.into()))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -58,7 +68,7 @@ mod test {
 
         // Always creates an archive on the top of the stack.
         let [rt1, rt2] = random_triads();
-        let stack = subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack;
+        let stack = ctx(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack;
         assert_eq!(stack.len(), 3);
         assert_eq!(stack[0], rt1);
         assert_eq!(stack[1], rt2);
@@ -70,6 +80,22 @@ mod test {
         "}
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let triad = ctx(&store, &mut log).download_impure(
+            "https://gist.githubusercontent.com/MaddieM4/92f0719922db5fbd60a12d762deca9ae/raw/37a4fe4d300b6a88913a808095fd52c1c356030a/reproducible.txt",
+        )?.finish()?;
+        assert_eq!(
+            print_archive(&store, triad)?,
+            indoc! {"
+          FILE /reproducible.txt
+            Length: 64
+        "}
+        );
         Ok(())
     }
 }

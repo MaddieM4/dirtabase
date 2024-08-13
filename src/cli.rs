@@ -1,6 +1,6 @@
 use crate::archive::core::Triad;
 use crate::logger::Logger;
-use crate::op::{perform as perform_op, Op};
+use crate::op::helpers::ctx;
 use indoc::indoc;
 use std::io::Write;
 use std::process::ExitCode;
@@ -87,8 +87,7 @@ pub fn execute(behavior: Behavior, log: &mut Logger) -> ExitCode {
 
 fn execute_pipeline(steps: Vec<String>, log: &mut Logger) -> std::io::Result<()> {
     let store = crate::storage::new("./.dirtabase_db")?;
-    let mut cfg = crate::op::helpers::Config::new(&store, log);
-    cfg.ctx().parse_apply(steps)?;
+    ctx(&store, log).parse_apply(steps)?;
     Ok(())
 }
 

@@ -27,6 +27,19 @@ impl Transform for &Import {
     }
 }
 
+impl<P> crate::op::helpers::Context<'_, P>
+where
+    P: AsRef<Path>,
+{
+    pub fn import<T>(self, args: impl IntoIterator<Item = T>) -> Result<Self>
+    where
+        T: AsRef<str>,
+    {
+        write!(self.log.opheader(), "--- Import ---\n")?;
+        self.apply(&Import::from_args(args)?)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -50,28 +63,36 @@ mod test {
 
         // Zero arguments
         let op = Import::from_args([] as [&str; 0])?;
-        assert_eq!(subvert(&store, &mut log).apply(&op)?.stack, vec![]);
+        assert_eq!(ctx(&store, &mut log).apply(&op)?.stack, vec![]);
         assert_eq!(
-            subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
+            ctx(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
             vec![rt1, rt2]
         );
 
         // One argument
         let op = Import::from_args(["fixture"])?;
-        assert_eq!(subvert(&store, &mut log).apply(&op)?.stack, vec![f]);
+        assert_eq!(ctx(&store, &mut log).apply(&op)?.stack, vec![f]);
         assert_eq!(
-            subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
+            ctx(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
             vec![rt1, rt2, f]
         );
 
         // Two arguments
         let op = Import::from_args(["fixture", "fixture"])?;
-        assert_eq!(subvert(&store, &mut log).apply(&op)?.stack, vec![f, f]);
+        assert_eq!(ctx(&store, &mut log).apply(&op)?.stack, vec![f, f]);
         assert_eq!(
-            subvert(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
+            ctx(&store, &mut log).with([rt1, rt2]).apply(&op)?.stack,
             vec![rt1, rt2, f, f]
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn ctx_extension() -> Result<()> {
+        let (store, mut log) = basic_kit();
+        let triad = ctx(&store, &mut log).import(["fixture"])?.finish()?;
+        assert_eq!(triad, fixture_triad());
         Ok(())
     }
 }
