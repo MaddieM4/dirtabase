@@ -1,52 +1,9 @@
-//! An experimental next round of innovation for Archives that should address
-//! the existing disparity between streams and other formats.
+//! Logic for converting to and from sequences of (path, attrs, contents).
 
+use super::types::*;
 use crate::attr::Attrs;
 use std::collections::HashMap;
 use std::iter::zip;
-
-// Internal Path Representation
-// This will be something pickier later
-pub type IPR = String;
-
-#[derive(Debug, PartialEq)]
-pub enum Contents<C> {
-    Dir,
-    File(C),
-}
-
-impl<C> Contents<C> {
-    pub fn is_dir(&self) -> bool {
-        match self {
-            Self::Dir => true,
-            Self::File(_) => false,
-        }
-    }
-
-    pub fn is_file(&self) -> bool {
-        match self {
-            Self::Dir => false,
-            Self::File(_) => true,
-        }
-    }
-}
-
-pub struct Ark<C> {
-    // Invariant: all files before all directories
-    // Invariant: within each category, sorted by path
-    // Invariant: no duplicate paths
-    paths: Vec<IPR>,
-
-    // Invariant: same length as paths
-    // Invariant: the logical entry at paths[n] has attributes attrs[n]
-    attrs: Vec<Attrs>,
-
-    // Invariant: the logical file at paths[n] contains contents[n]
-    // Invariant: because files precede dirs, len is just the number of files
-    //   (which means you can quickly get file and dir counts, the index where
-    //   they cross over from one section to another, etc.)
-    contents: Vec<C>,
-}
 
 impl<C> From<Vec<(IPR, Attrs, Contents<C>)>> for Ark<C> {
     fn from(src: Vec<(IPR, Attrs, Contents<C>)>) -> Self {
@@ -103,7 +60,7 @@ mod test {
     use crate::at;
 
     #[test]
-    fn entries_empty() {
+    fn empty() {
         // FROM
         let ark: Ark<&'static str> = vec![].into();
         assert_eq!(ark.paths, vec![] as Vec::<IPR>);
@@ -116,7 +73,7 @@ mod test {
     }
 
     #[test]
-    fn entries_one_dir() {
+    fn one_dir() {
         // FROM
         let ark: Ark<&'static str> =
             vec![("/hello".to_owned(), at! {HELLO => "world"}, Contents::Dir)].into();
@@ -133,7 +90,7 @@ mod test {
     }
 
     #[test]
-    fn entries_one_file() {
+    fn one_file() {
         // FROM
         let ark: Ark<_> = vec![(
             "/hello.txt".to_owned(),
@@ -158,7 +115,7 @@ mod test {
     }
 
     #[test]
-    fn entries_mix() {
+    fn mix() {
         // FROM
         let ark: Ark<_> = vec![
             (
@@ -217,7 +174,7 @@ mod test {
     }
 
     #[test]
-    fn entries_overrides() {
+    fn overrides() {
         // FROM
         let ark: Ark<_> = vec![
             ("/x".to_owned(), at! { N => "1"}, Contents::File("1")),
