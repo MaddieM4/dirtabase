@@ -38,49 +38,10 @@ use std::io::{self, Cursor, Write};
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 
-/// All supported storage backends.
-pub enum Store {
-    /// Behaves persistently, does not auto-delete itself when dropped.
-    Simple(PathBuf, SimpleCAS, SimpleLabels),
-
-    /// Deletes itself from disk when it goes out of lexical scope.
-    SimpleTemp(tempfile::TempDir, SimpleCAS, SimpleLabels),
-}
-
-impl Store {
-    pub fn new_simple(path: impl AsRef<Path>) -> io::Result<Self> {
-        let path: PathBuf = path.as_ref().into();
-        let cas = SimpleCAS::new(path.join("cas"))?;
-        let labels = SimpleLabels::new(path.join("labels"))?;
-        Ok(Self::Simple(path, cas, labels))
-    }
-
-    pub fn new_simpletemp() -> io::Result<Self> {
-        let dir = tempfile::tempdir()?;
-        let cas = SimpleCAS::new(dir.path().join("cas"))?;
-        let labels = SimpleLabels::new(dir.path().join("labels"))?;
-        Ok(Self::SimpleTemp(dir, cas, labels))
-    }
-
-    pub fn cas(&self) -> &SimpleCAS {
-        match self {
-            Self::Simple(_, cas, _) => &cas,
-            Self::SimpleTemp(_, cas, _) => &cas,
-        }
-    }
-
-    pub fn labels(&self) -> &SimpleLabels {
-        match self {
-            Self::Simple(_, _, labels) => &labels,
-            Self::SimpleTemp(_, _, labels) => &labels,
-        }
-    }
-}
-
 /// Content-addressed storage in the Simple DB format.
 pub struct SimpleCAS(PathBuf);
 impl SimpleCAS {
-    fn new(path: impl AsRef<Path>) -> io::Result<Self> {
+    pub fn new(path: impl AsRef<Path>) -> io::Result<Self> {
         let path: PathBuf = path.as_ref().into();
         std::fs::create_dir_all(&path)?;
         Ok(Self(path))
@@ -136,7 +97,7 @@ impl SimpleCAS {
 /// the CAS section of the same Storage.
 pub struct SimpleLabels(PathBuf);
 impl SimpleLabels {
-    fn new(path: impl AsRef<Path>) -> io::Result<Self> {
+    pub fn new(path: impl AsRef<Path>) -> io::Result<Self> {
         let path: PathBuf = path.as_ref().into();
         std::fs::create_dir_all(&path)?;
         Ok(Self(path))
@@ -168,6 +129,7 @@ impl SimpleLabels {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::storage::Store;
     use std::io::Read;
 
     #[test]
