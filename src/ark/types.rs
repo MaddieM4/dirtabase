@@ -85,4 +85,26 @@ impl<C> Ark<C> {
     pub fn contents(&self) -> &Vec<C> {
         &self.contents
     }
+
+    /// Slap together a new Ark from the constituent pieces.
+    ///
+    /// Panics if length invariants aren't fulfilled.
+    pub fn compose(paths: Vec<IPR>, attrs: Vec<Attrs>, contents: Vec<C>) -> Self {
+        assert!(paths.len() == attrs.len());
+        assert!(paths.len() >= contents.len());
+        Self {
+            paths: paths,
+            attrs: attrs,
+            contents: contents,
+        }
+    }
+
+    /// Break an Ark into its constituent components, moving them.
+    ///
+    /// This is designed to pair with `compose` to allow you to reuse backing
+    /// memory while doing transformations. Usually you'll only care about
+    /// transforming one, maybe two of the three channels.
+    pub fn decompose(self) -> (Vec<IPR>, Vec<Attrs>, Vec<C>) {
+        (self.paths, self.attrs, self.contents)
+    }
 }
