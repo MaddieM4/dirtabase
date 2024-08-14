@@ -1,3 +1,4 @@
+use super::save::Save;
 use super::types::*;
 use crate::db::DB;
 use crate::digest::Digest;
@@ -19,6 +20,10 @@ fn hash_files(paths: &Vec<PathBuf>) -> Result<Vec<Digest>> {
 pub trait Import {
     /// Import files into an on-disk database.
     fn import_files(&self, db: &DB) -> Result<Ark<Digest>>;
+
+    fn import(&self, db: &DB) -> Result<Digest> {
+        self.import_files(db)?.save(db)
+    }
 }
 
 impl Import for Ark<PathBuf> {
@@ -113,6 +118,17 @@ mod test {
         // Get same results if we start from in-mem copy
         assert_eq!(Ark::scan("fixture")?.read()?.import_files(&db)?, ark);
 
+        Ok(())
+    }
+
+    #[test]
+    fn import() -> Result<()> {
+        let db = DB::new_temp()?;
+        let digest = Ark::scan("fixture")?.import(&db)?;
+        assert_eq!(
+            digest.to_hex(),
+            "647f1efbfa520cfc16d974d0a1414f5795e58f612bd4928039b7088c347250b8"
+        );
         Ok(())
     }
 }
