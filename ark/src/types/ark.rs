@@ -137,8 +137,7 @@ impl From<Ark<String>> for Ark<Vec<u8>> {
     }
 }
 
-// Disabled until more stuff is ready
-#[cfg(toast)]
+#[cfg(test)]
 mod test {
     use super::*;
     use crate::at;
