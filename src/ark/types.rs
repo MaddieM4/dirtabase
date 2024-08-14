@@ -47,7 +47,7 @@ impl<C> Contents<C> {
 ///   - ark.paths()
 ///   - ark.attrs()
 ///   - ark.contents()
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Ark<C> {
     pub(super) paths: Vec<IPR>,
     pub(super) attrs: Vec<Attrs>,
@@ -107,5 +107,55 @@ impl<C> Ark<C> {
     /// transforming one, maybe two of the three channels.
     pub fn decompose(self) -> (Vec<IPR>, Vec<Attrs>, Vec<C>) {
         (self.paths, self.attrs, self.contents)
+    }
+
+    /// Easy conversion by content type. Not quite automatic though.
+    fn translate<SRC>(src: Ark<SRC>) -> Self
+    where
+        C: From<SRC>,
+    {
+        let (paths, attrs, contents) = src.decompose();
+        let contents: Vec<C> = contents.into_iter().map(|t| t.into()).collect();
+        Self::compose(paths, attrs, contents)
+    }
+}
+
+impl From<Ark<&str>> for Ark<Vec<u8>> {
+    fn from(src: Ark<&str>) -> Self {
+        Self::translate(src)
+    }
+}
+impl From<Ark<&str>> for Ark<String> {
+    fn from(src: Ark<&str>) -> Self {
+        Self::translate(src)
+    }
+}
+impl From<Ark<String>> for Ark<Vec<u8>> {
+    fn from(src: Ark<String>) -> Self {
+        Self::translate(src)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::at;
+
+    #[test]
+    fn conversions() {
+        let str_ark: Ark<&str> = vec![
+            ("/a".to_owned(), at! { N => "1" }, Contents::File("1")),
+            ("/b".to_owned(), at! { N => "2" }, Contents::Dir),
+            ("/c".to_owned(), at! { N => "3" }, Contents::File("3")),
+            ("/d".to_owned(), at! { N => "4" }, Contents::Dir),
+            ("/e".to_owned(), at! { N => "5" }, Contents::File("5")),
+            ("/f".to_owned(), at! { N => "6" }, Contents::Dir),
+        ]
+        .into();
+
+        let string_ark: Ark<String> = str_ark.clone().into();
+        let ba1: Ark<Vec<u8>> = str_ark.clone().into();
+        let ba2: Ark<Vec<u8>> = string_ark.into();
+        assert_eq!(ba1, ba2);
     }
 }
