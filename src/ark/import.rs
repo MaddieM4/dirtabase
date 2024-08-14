@@ -8,6 +8,15 @@ use std::path::PathBuf;
 
 fn hash_file(pb: &PathBuf) -> Result<Digest> {
     let f = std::fs::File::open(pb)?;
+
+    if f.metadata()?.len() == 0 {
+        // Unfortunately it's an error to map an empty file.
+        // It's deeply obnoxious to need a second metadata call here.
+        // Maybe a solution will eventually present itself, or perhaps when
+        // actually benched, the cost of this op is trivial. Hard to say!
+        return Ok(Digest::from(""));
+    }
+
     let mmap = unsafe { memmap::Mmap::map(&f)? };
     Ok(Digest::from(mmap.as_ref()))
 }
@@ -21,6 +30,7 @@ pub trait Import {
     /// Import files into an on-disk database.
     fn import_files(&self, db: &DB) -> Result<Ark<Digest>>;
 
+    /// Import files _and_ serialized self into DB.
     fn import(&self, db: &DB) -> Result<Digest> {
         self.import_files(db)?.save(db)
     }
@@ -129,6 +139,14 @@ mod test {
             digest.to_hex(),
             "647f1efbfa520cfc16d974d0a1414f5795e58f612bd4928039b7088c347250b8"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn empty_files() -> Result<()> {
+        let db = DB::new_temp()?;
+        let digest = Ark::scan("src")?.import(&db);
+        assert!(digest.is_ok());
         Ok(())
     }
 }
