@@ -1,6 +1,7 @@
 //! The core types and nothing else.
 
 use crate::attr::Attrs;
+use serde::{Deserialize, Serialize};
 
 /// Internal Path Representation.
 ///
@@ -47,7 +48,7 @@ impl<C> Contents<C> {
 ///   - ark.paths()
 ///   - ark.attrs()
 ///   - ark.contents()
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Ark<C> {
     pub(super) paths: Vec<IPR>,
     pub(super) attrs: Vec<Attrs>,

@@ -1,6 +1,8 @@
 pub mod archive;
 pub mod ark;
 pub mod attr;
+pub mod build;
+pub mod db;
 pub mod digest;
 pub mod enc;
 pub mod label;
