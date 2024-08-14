@@ -2,13 +2,19 @@ use crate::types::*;
 use std::collections::HashMap;
 use std::iter::zip;
 
-impl<C> From<Vec<(IPR, Attrs, Contents<C>)>> for Ark<C> {
-    fn from(src: Vec<(IPR, Attrs, Contents<C>)>) -> Self {
+impl<C, S> From<Vec<(S, Attrs, Contents<C>)>> for Ark<C>
+where
+    S: Into<IPR>,
+{
+    fn from(src: Vec<(S, Attrs, Contents<C>)>) -> Self {
         let mut paths = Vec::<IPR>::new();
         let mut attrs = Vec::<Attrs>::new();
         let mut contents = Vec::<C>::new();
 
-        let uniq: HashMap<_, _> = src.into_iter().map(|(p, a, c)| (p, (a, c))).collect();
+        let uniq: HashMap<IPR, (Attrs, Contents<C>)> = src
+            .into_iter()
+            .map(|(p, a, c)| (p.into(), (a, c)))
+            .collect();
 
         let (mut files, mut dirs): (Vec<_>, Vec<_>) = uniq
             .into_iter()
@@ -59,22 +65,22 @@ mod test {
     #[test]
     fn empty() {
         // FROM
-        let ark: Ark<&'static str> = vec![].into();
+        let entries: Vec<(&str, Attrs, Contents<()>)> = vec![];
+        let ark: Ark<()> = entries.into();
         assert_eq!(ark.paths, vec![] as Vec::<IPR>);
         assert_eq!(ark.attrs, vec![] as Vec::<Attrs>);
-        assert_eq!(ark.contents, vec![] as Vec::<&'static str>);
+        assert_eq!(ark.contents, vec![] as Vec::<()>);
 
         // TO
-        let entries: Vec<(IPR, Attrs, Contents<&str>)> = ark.into();
+        let entries: Vec<(IPR, Attrs, Contents<()>)> = ark.into();
         assert_eq!(entries, vec![]);
     }
 
     #[test]
     fn one_dir() {
         // FROM
-        let ark: Ark<&'static str> =
-            vec![("/hello".to_owned(), at! {HELLO => "world"}, Contents::Dir)].into();
-        assert_eq!(ark.paths, vec!["/hello".to_owned()]);
+        let ark: Ark<&'static str> = vec![("/hello", at! {HELLO => "world"}, Contents::Dir)].into();
+        assert_eq!(ark.paths, vec!["/hello"]);
         assert_eq!(ark.attrs, vec![at! {HELLO => "world"}]);
         assert_eq!(ark.contents, vec![] as Vec::<&'static str>);
 
@@ -82,7 +88,7 @@ mod test {
         let entries: Vec<(IPR, Attrs, Contents<&str>)> = ark.into();
         assert_eq!(
             entries,
-            vec![("/hello".to_owned(), at! {HELLO=>"world"}, Contents::Dir)]
+            vec![("/hello".into(), at! {HELLO=>"world"}, Contents::Dir)]
         );
     }
 
@@ -90,12 +96,12 @@ mod test {
     fn one_file() {
         // FROM
         let ark: Ark<_> = vec![(
-            "/hello.txt".to_owned(),
+            "/hello.txt",
             at! {HELLO => "with text"},
             Contents::File("Some contents"),
         )]
         .into();
-        assert_eq!(ark.paths, vec!["/hello.txt".to_owned()]);
+        assert_eq!(ark.paths, vec!["/hello.txt"]);
         assert_eq!(ark.attrs, vec![at! {HELLO => "with text"}]);
         assert_eq!(ark.contents, vec!["Some contents"]);
 
@@ -104,7 +110,7 @@ mod test {
         assert_eq!(
             entries,
             vec![(
-                "/hello.txt".to_owned(),
+                "/hello.txt".into(),
                 at! {HELLO=>"with text"},
                 Contents::File("Some contents")
             )]
@@ -116,13 +122,13 @@ mod test {
         // FROM
         let ark: Ark<_> = vec![
             (
-                "/hello.txt".to_owned(),
+                "/hello.txt",
                 at! {HELLO => "with text"},
                 Contents::File("Some contents"),
             ),
-            ("/another".to_owned(), at! { DIR => "yeah" }, Contents::Dir),
+            ("/another", at! { DIR => "yeah" }, Contents::Dir),
             (
-                "/another/file.txt".to_owned(),
+                "/another/file.txt",
                 at! { ANOTHER => "file" },
                 Contents::File("Different contents"),
             ),
@@ -132,11 +138,7 @@ mod test {
         // Files before dirs, each sorted
         assert_eq!(
             ark.paths,
-            vec![
-                "/another/file.txt".to_owned(),
-                "/hello.txt".to_owned(),
-                "/another".to_owned(),
-            ]
+            vec!["/another/file.txt", "/hello.txt", "/another",]
         );
 
         // Match order
@@ -156,16 +158,16 @@ mod test {
             entries,
             vec![
                 (
-                    "/another/file.txt".to_owned(),
+                    "/another/file.txt".into(),
                     at! { ANOTHER => "file" },
                     Contents::File("Different contents"),
                 ),
                 (
-                    "/hello.txt".to_owned(),
+                    "/hello.txt".into(),
                     at! {HELLO => "with text"},
                     Contents::File("Some contents"),
                 ),
-                ("/another".to_owned(), at! { DIR => "yeah" }, Contents::Dir),
+                ("/another".into(), at! { DIR => "yeah" }, Contents::Dir),
             ]
         );
     }
@@ -174,25 +176,22 @@ mod test {
     fn overrides() {
         // FROM
         let ark: Ark<_> = vec![
-            ("/x".to_owned(), at! { N => "1"}, Contents::File("1")),
-            ("/x".to_owned(), at! { N => "2" }, Contents::Dir),
-            ("/x".to_owned(), at! { N => "3"}, Contents::File("3")),
-            ("/x".to_owned(), at! { N => "4" }, Contents::Dir),
-            ("/x".to_owned(), at! { N => "5"}, Contents::File("5")),
-            ("/x".to_owned(), at! { N => "6" }, Contents::Dir),
+            ("/x", at! { N => "1"}, Contents::File("1")),
+            ("/x", at! { N => "2" }, Contents::Dir),
+            ("/x", at! { N => "3"}, Contents::File("3")),
+            ("/x", at! { N => "4" }, Contents::Dir),
+            ("/x", at! { N => "5"}, Contents::File("5")),
+            ("/x", at! { N => "6" }, Contents::Dir),
         ]
         .into();
 
         // Last item should win
-        assert_eq!(ark.paths, vec!["/x".to_owned()]);
+        assert_eq!(ark.paths, vec!["/x"]);
         assert_eq!(ark.attrs, vec![at! { N => "6"}]);
         assert_eq!(ark.contents, vec![] as Vec::<&str>);
 
         // TO
         let entries: Vec<(IPR, Attrs, Contents<&str>)> = ark.into();
-        assert_eq!(
-            entries,
-            vec![("/x".to_owned(), at! {N => "6"}, Contents::Dir)]
-        );
+        assert_eq!(entries, vec![("/x".into(), at! {N => "6"}, Contents::Dir)]);
     }
 }

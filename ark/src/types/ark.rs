@@ -1,12 +1,8 @@
 //! The core types and nothing else.
 
 use crate::types::attrs::Attrs;
-use serde::{Deserialize, Serialize};
-
-/// Internal Path Representation.
-///
-/// This will be something pickier later with its own invariants.
-pub type IPR = String;
+use crate::types::ipr::IPR;
+// use serde::{Deserialize, Serialize};
 
 /// An enum we use to differentiate dirs vs files.
 ///
@@ -48,7 +44,8 @@ impl<C> Contents<C> {
 ///   - ark.paths()
 ///   - ark.attrs()
 ///   - ark.contents()
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+//#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Ark<C> {
     pub(crate) paths: Vec<IPR>,
     pub(crate) attrs: Vec<Attrs>,
@@ -145,12 +142,12 @@ mod test {
     #[test]
     fn conversions() {
         let str_ark: Ark<&str> = vec![
-            ("/a".to_owned(), at! { N => "1" }, Contents::File("1")),
-            ("/b".to_owned(), at! { N => "2" }, Contents::Dir),
-            ("/c".to_owned(), at! { N => "3" }, Contents::File("3")),
-            ("/d".to_owned(), at! { N => "4" }, Contents::Dir),
-            ("/e".to_owned(), at! { N => "5" }, Contents::File("5")),
-            ("/f".to_owned(), at! { N => "6" }, Contents::Dir),
+            ("/a", at! { N => "1" }, Contents::File("1")),
+            ("/b", at! { N => "2" }, Contents::Dir),
+            ("/c", at! { N => "3" }, Contents::File("3")),
+            ("/d", at! { N => "4" }, Contents::Dir),
+            ("/e", at! { N => "5" }, Contents::File("5")),
+            ("/f", at! { N => "6" }, Contents::Dir),
         ]
         .into();
 
