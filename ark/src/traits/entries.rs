@@ -1,6 +1,7 @@
 use crate::types::*;
 use std::collections::HashMap;
 use std::iter::zip;
+use std::rc::Rc;
 
 impl<C, S> From<Vec<(S, Attrs, Contents<C>)>> for Ark<C>
 where
@@ -36,18 +37,21 @@ where
             attrs.push(a);
         }
 
-        Self(paths, attrs, contents)
+        Self(Rc::new(paths), Rc::new(attrs), Rc::new(contents))
     }
 }
 
-impl<C> From<Ark<C>> for Vec<(IPR, Attrs, Contents<C>)> {
+impl<C> From<Ark<C>> for Vec<(IPR, Attrs, Contents<C>)>
+where
+    Vec<C>: Clone,
+{
     fn from(src: Ark<C>) -> Self {
         let (paths, attrs, contents) = src.decompose();
-        let file_contents = contents.into_iter().map(|c| Contents::File(c));
+        let file_contents = (*contents).clone().into_iter().map(|c| Contents::File(c));
         let dir_contents = std::iter::from_fn(move || Some(Contents::Dir));
         let contents = file_contents.chain(dir_contents);
 
-        zip(paths, attrs)
+        zip((*paths).clone(), (*attrs).clone())
             .zip(contents)
             .map(|((p, a), c)| (p, a, c))
             .collect()

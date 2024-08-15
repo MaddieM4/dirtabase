@@ -3,6 +3,7 @@
 use crate::types::attrs::Attrs;
 use crate::types::ipr::IPR;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 
 /// An enum we use to differentiate dirs vs files.
 ///
@@ -44,11 +45,17 @@ impl<C> Contents<C> {
 ///   - ark.paths()
 ///   - ark.attrs()
 ///   - ark.contents()
+///
+/// These three channels are implemented as immutable, reference-counted
+/// vectors. This is great for memory hygiene! Almost every possible
+/// transformation you'd ever want to do on an Ark will leave one or two
+/// channels unchanged, and create a new vector for the stuff that _is_
+/// changing. See [`translate`] for a prime example.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Ark<C>(
-    pub(crate) Vec<IPR>,
-    pub(crate) Vec<Attrs>,
-    pub(crate) Vec<C>,
+    pub(crate) Rc<Vec<IPR>>,
+    pub(crate) Rc<Vec<Attrs>>,
+    pub(crate) Rc<Vec<C>>,
 );
 
 impl<C> Ark<C> {
@@ -87,7 +94,7 @@ impl<C> Ark<C> {
     /// Slap together a new Ark from the constituent pieces.
     ///
     /// Panics if length invariants aren't fulfilled.
-    pub fn compose(paths: Vec<IPR>, attrs: Vec<Attrs>, contents: Vec<C>) -> Self {
+    pub fn compose(paths: Rc<Vec<IPR>>, attrs: Rc<Vec<Attrs>>, contents: Rc<Vec<C>>) -> Self {
         assert!(paths.len() == attrs.len());
         assert!(paths.len() >= contents.len());
         Self(paths, attrs, contents)
@@ -98,18 +105,30 @@ impl<C> Ark<C> {
     /// This is designed to pair with `compose` to allow you to reuse backing
     /// memory while doing transformations. Usually you'll only care about
     /// transforming one, maybe two of the three channels.
-    pub fn decompose(self) -> (Vec<IPR>, Vec<Attrs>, Vec<C>) {
+    pub fn decompose(self) -> (Rc<Vec<IPR>>, Rc<Vec<Attrs>>, Rc<Vec<C>>) {
         (self.0, self.1, self.2)
     }
 
-    /// Easy conversion by content type. Not quite automatic though.
+    /// Create an empty Ark.
+    ///
+    /// Not as widely useful as you'd think, since Ark is efficient for bulk
+    /// operations, and not a great type for incremental mutability. Usually
+    /// you'll want to work with a list of (path, attrs, Contents<C>) tuples for
+    /// poking around in little bits and pieces. These convert back and forth
+    /// with Arks very easily.
+    pub fn empty() -> Self {
+        Self::compose(Rc::new(vec![]), Rc::new(vec![]), Rc::new(vec![]))
+    }
+
+    /// Easy conversion by content type.
     fn translate<SRC>(src: Ark<SRC>) -> Self
     where
         C: From<SRC>,
+        SRC: Clone,
     {
         let (paths, attrs, contents) = src.decompose();
-        let contents: Vec<C> = contents.into_iter().map(|t| t.into()).collect();
-        Self(paths, attrs, contents)
+        let contents: Vec<C> = (*contents).iter().map(|t| t.clone().into()).collect();
+        Self(paths, attrs, Rc::new(contents))
     }
 }
 
