@@ -76,6 +76,19 @@ impl Attrs {
     }
 }
 
+/// A macro that makes it easy to construct Attrs objects.
+///
+/// If you look through the code, we make pervasive use of this macro, because
+/// it's so much more concise and readable, which leads to less human error.
+///
+/// ```
+/// use ark::{at, Attrs};
+///
+/// assert_eq!(
+///     at! { HELLO => "WORLD", GOOD => "JOB" },
+///     Attrs::new().append("HELLO","WORLD").append("GOOD","JOB")
+/// );
+/// ```
 #[macro_export]
 macro_rules! at {
     ( $( $k:expr => $v:expr ),* ) => {

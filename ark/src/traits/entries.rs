@@ -1,20 +1,69 @@
+//! Convert to and from lists of entries.
+//!
+//! These are just vectors of tuples, in either of these forms:
+//!
+//!  * `(path, attrs, contents)`
+//!  * `(path, contents)`
+//!
+//! The latter is more useful for simple demonstrations, but in real world use
+//! cases, attrs store information you usually care about later, like the
+//! permissions (including executable bit) of files and directories.
+//!
+//! ```
+//! use ::ark::*;
+//!
+//! // Infer blank attrs for each.
+//! let ark = Ark::from_entries([
+//!     ("dir", Contents::Dir),
+//!     ("dir/some_file.js", Contents::File("console.log('hi!')")),
+//! ]);
+//!
+//! // Produces a (p,a,c)-style vector.
+//! //
+//! // Note that the order is different! Arks have a canon order for storing
+//! // their records. The original order is not preserved.
+//! let entries = ark.to_entries();
+//! assert_eq!(entries[0],
+//!     ("dir/some_file.js".to_ipr(), Attrs::new(), Contents::File("console.log('hi!')")));
+//! ```
 use crate::types::*;
 use std::collections::HashMap;
 use std::iter::zip;
 use std::rc::Rc;
 
-impl<C, S> From<Vec<(S, Attrs, Contents<C>)>> for Ark<C>
+/// Internal conversion format.
+pub struct Entry<C>(IPR, Attrs, Contents<C>);
+
+impl<S, C> From<(S, Attrs, Contents<C>)> for Entry<C>
 where
     S: Into<IPR>,
 {
-    fn from(src: Vec<(S, Attrs, Contents<C>)>) -> Self {
-        let mut paths = Vec::<IPR>::new();
-        let mut attrs = Vec::<Attrs>::new();
-        let mut contents = Vec::<C>::new();
+    fn from(src: (S, Attrs, Contents<C>)) -> Self {
+        Self(src.0.into(), src.1, src.2)
+    }
+}
 
-        let uniq: HashMap<IPR, (Attrs, Contents<C>)> = src
+impl<S, C> From<(S, Contents<C>)> for Entry<C>
+where
+    S: Into<IPR>,
+{
+    fn from(src: (S, Contents<C>)) -> Self {
+        Self(src.0.into(), Attrs::new(), src.1)
+    }
+}
+
+impl<C> Ark<C> {
+    /// Read entries into Ark format.
+    pub fn from_entries<E>(entries: impl IntoIterator<Item = E>) -> Self
+    where
+        E: Into<Entry<C>>,
+    {
+        let uniq: HashMap<IPR, (Attrs, Contents<C>)> = entries
             .into_iter()
-            .map(|(p, a, c)| (p.into(), (a, c)))
+            .map(|e| {
+                let entry: Entry<C> = e.into();
+                (entry.0, (entry.1, entry.2))
+            })
             .collect();
 
         let (mut files, mut dirs): (Vec<_>, Vec<_>) = uniq
@@ -22,9 +71,13 @@ where
             .map(|(p, (a, c))| (p, a, c))
             .partition(|(_, _, c)| c.is_file());
 
-        files.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        dirs.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        // Let's start putting stuff in boxes here.
+        let n = files.len() + dirs.len();
+        let mut paths = Vec::<IPR>::with_capacity(n);
+        let mut attrs = Vec::<Attrs>::with_capacity(n);
+        let mut contents = Vec::<C>::with_capacity(files.len());
 
+        files.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         for (p, a, c) in files {
             paths.push(p);
             attrs.push(a);
@@ -32,12 +85,51 @@ where
                 contents.push(content)
             }
         }
+
+        dirs.sort_unstable_by(|a, b| a.0.cmp(&b.0));
         for (p, a, _) in dirs {
             paths.push(p);
             attrs.push(a);
         }
 
         Self(Rc::new(paths), Rc::new(attrs), Rc::new(contents))
+    }
+
+    /// Turn this Ark into a Vec of entries.
+    pub fn to_entries(self) -> Vec<(IPR, Attrs, Contents<C>)>
+    where
+        Vec<C>: Clone,
+    {
+        let (paths, attrs, contents) = self.decompose();
+        let file_contents = (*contents).clone().into_iter().map(|c| Contents::File(c));
+        let dir_contents = std::iter::from_fn(move || Some(Contents::Dir));
+        let contents = file_contents.chain(dir_contents);
+
+        zip((*paths).clone(), (*attrs).clone())
+            .zip(contents)
+            .map(|((p, a), c)| (p, a, c))
+            .collect()
+    }
+}
+
+impl<C, S> From<Vec<(S, Attrs, Contents<C>)>> for Ark<C>
+where
+    S: Into<IPR>,
+{
+    fn from(src: Vec<(S, Attrs, Contents<C>)>) -> Self {
+        Ark::from_entries(src)
+    }
+}
+
+impl<C, S> From<Vec<(S, Contents<C>)>> for Ark<C>
+where
+    S: Into<IPR>,
+{
+    fn from(src: Vec<(S, Contents<C>)>) -> Self {
+        src.into_iter()
+            .map(|(p, c)| (p, Attrs::new(), c))
+            .collect::<Vec<_>>()
+            .into()
     }
 }
 

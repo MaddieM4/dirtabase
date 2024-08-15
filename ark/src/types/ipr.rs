@@ -1,3 +1,5 @@
+//! Internal path represenation. UNIX paths, but stricter.
+
 use lazy_regex::regex;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -36,6 +38,7 @@ where
     }
 }
 
+/// Types that can be converted to IPRs.
 pub trait ToIPR: AsRef<str> {
     fn to_ipr(&self) -> IPR {
         let converted = IPR::canonize(self.as_ref());
@@ -43,6 +46,7 @@ pub trait ToIPR: AsRef<str> {
     }
 }
 
+// This makes the From implementatsions so much easier. Seriously.
 impl ToIPR for &str {}
 impl ToIPR for &&str {}
 impl ToIPR for String {}
@@ -100,6 +104,7 @@ impl<'de> Deserialize<'de> for IPR {
 }
 
 impl IPR {
+    /// Quick check to see if a string already meets requirements.
     pub fn is_well_formed(src: &str) -> bool {
         // Quick and nasty way of avoiding regex cost.
         // Probably should have benched this before all the work.
@@ -143,6 +148,9 @@ impl IPR {
         }
     }
 
+    /// Produce a [`&str`] in IPR form.
+    ///
+    /// Reuses original string if it's already suitable. Hence the Cow.
     pub fn canonize<'a>(src: &'a str) -> Cow<'a, str> {
         if IPR::is_well_formed(&src) {
             Cow::Borrowed(src)
@@ -151,6 +159,10 @@ impl IPR {
         }
     }
 
+    /// Produce an owned [`String`] in IPR form.
+    ///
+    /// Doesn't short-circuit to reuse existing memory. Just always charges
+    /// forward with a statically compiled regex and gets 'er done.
     pub fn force_canonize(src: &str) -> String {
         let r = regex!("/");
         r.split(src)

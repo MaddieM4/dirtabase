@@ -1,3 +1,21 @@
+//! A library for efficient bulk operations on immutable directory data.
+//!
+//! The filesystem isn't immutable, in fact it's very, very mutable. So it's a
+//! little tricky to do operations on the filesystem "as if" they're immutable.
+//! But if you could, there's lots of reasons that could be useful. You'd have a
+//! "save point" at every little step of the process. You could cache any
+//! actions you take that are _deterministic_ (always get the same results when
+//! you do the same thing), letting you skip work that you've done before. And
+//! there's things you could do exceptionally fast by doing most of the work in
+//! memory.
+//!
+//! That's what Dirtabase does, although it handles more the "build pipelines"
+//! part of the problem. The underlying Swiss Army knife for Dirtabase is Ark,
+//! which is a data structure that lets you do a lot of work in-memory,
+//! efficiently. Check out the [`crate::types::ark::Ark`] type for more detail.
+//!
+//! tl;dr It's like Virtual DOM but applied to directory data.
+
 pub mod traits;
 pub mod types;
 
