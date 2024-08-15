@@ -1,4 +1,4 @@
-workspace = { members = ["ark"] }
+workspace = { members = ["ark", "builder"] }
 [package]
 name = "dirtabase"
 version = "0.1.0"
