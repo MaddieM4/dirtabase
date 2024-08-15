@@ -1,5 +1,5 @@
-// use serde::{Deserialize, Serialize};
 use lazy_regex::regex;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 /// Internal Path Representation.
@@ -18,7 +18,7 @@ use std::borrow::Cow;
 /// paths, and you may find some imports fail when dealing with non-unicode
 /// paths. The official dirtabase/ark policy for these situations is "we aren't
 /// making stuff for your use case."
-#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq, Hash, Serialize)]
 pub struct IPR(String);
 
 impl AsRef<str> for IPR {
@@ -66,6 +66,36 @@ impl From<String> for IPR {
 impl From<&String> for IPR {
     fn from(other: &String) -> IPR {
         other.to_ipr()
+    }
+}
+
+// Deserialization done manually in order to not trust loaded arks.
+//
+// This is a pain, but it gets a little more manageable each time I have to
+// write one of these. I think it comes from the weird little gap of the process
+// that you're filling when you write a deserializer. Probably makes a lot of
+// sense in full context.
+struct IPRVisitor;
+impl<'de> serde::de::Visitor<'de> for IPRVisitor {
+    type Value = IPR;
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a path string (IPR)")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value.to_ipr())
+    }
+}
+
+impl<'de> Deserialize<'de> for IPR {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(IPRVisitor)
     }
 }
 
@@ -207,5 +237,19 @@ mod test {
         let original: String = "/hello/world/".to_owned();
         let converted: IPR = original.into();
         assert_eq!(converted.0, "hello/world".to_owned());
+    }
+
+    #[test]
+    fn serialize() {
+        let some_path: IPR = "/fixme/".into();
+        let serialized = serde_json::to_string(&some_path).expect("Serialized OK");
+        assert_eq!(serialized, "\"fixme\"");
+    }
+
+    #[test]
+    fn deserialize() {
+        let serialized = "\"/fixme/\""; // Has issues!
+        let deserialized: IPR = serde_json::from_str(&serialized).expect("Deserialized OK");
+        assert_eq!(deserialized.0, "fixme".to_owned());
     }
 }

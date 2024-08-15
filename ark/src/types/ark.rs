@@ -2,7 +2,7 @@
 
 use crate::types::attrs::Attrs;
 use crate::types::ipr::IPR;
-// use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// An enum we use to differentiate dirs vs files.
 ///
@@ -44,8 +44,7 @@ impl<C> Contents<C> {
 ///   - ark.paths()
 ///   - ark.attrs()
 ///   - ark.contents()
-//#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Ark<C> {
     pub(crate) paths: Vec<IPR>,
     pub(crate) attrs: Vec<Attrs>,
