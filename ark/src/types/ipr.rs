@@ -3,6 +3,7 @@
 use lazy_regex::regex;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
 /// Internal Path Representation.
 ///
@@ -70,6 +71,42 @@ impl From<String> for IPR {
 impl From<&String> for IPR {
     fn from(other: &String) -> IPR {
         other.to_ipr()
+    }
+}
+
+/// Conversion failed because path wasn't valid Unicode.
+///
+/// That's not required for operating systems! But it's required for Ark. Life
+/// is just really hard in a lot of ways down the road if you don't have this
+/// baseline of sanity established.
+#[derive(Debug)]
+pub struct NonUnicodePath(pub PathBuf);
+impl std::fmt::Display for NonUnicodePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        write!(f, "Path wasn't unicode: {:?}", self.0)
+    }
+}
+impl std::error::Error for NonUnicodePath {}
+impl From<NonUnicodePath> for std::io::Error {
+    fn from(p: NonUnicodePath) -> Self {
+        Self::other(p)
+    }
+}
+
+impl TryFrom<&Path> for IPR {
+    type Error = NonUnicodePath;
+    fn try_from(other: &Path) -> Result<IPR, Self::Error> {
+        Ok(other
+            .to_str()
+            .ok_or_else(|| NonUnicodePath(other.to_path_buf()))?
+            .into())
+    }
+}
+impl TryFrom<PathBuf> for IPR {
+    type Error = NonUnicodePath;
+    fn try_from(other: PathBuf) -> Result<IPR, Self::Error> {
+        let p: &Path = other.as_ref();
+        Self::try_from(p)
     }
 }
 
@@ -249,6 +286,20 @@ mod test {
         let original: String = "/hello/world/".to_owned();
         let converted: IPR = original.into();
         assert_eq!(converted.0, "hello/world".to_owned());
+    }
+
+    #[test]
+    fn convert_path() {
+        let original: &Path = Path::new("/foo/bar//baz");
+        let converted: IPR = original.try_into().expect("That's basically sane");
+        assert_eq!(converted.0, "foo/bar/baz");
+    }
+
+    #[test]
+    fn convert_pathbuf() {
+        let original: PathBuf = Path::new("/foo/bar//baz").to_path_buf();
+        let converted: IPR = original.try_into().expect("That's basically sane");
+        assert_eq!(converted.0, "foo/bar/baz");
     }
 
     #[test]

@@ -19,6 +19,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use std::os::unix::fs::PermissionsExt;
 
 /// A single attribute on a file or directory.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -73,6 +74,12 @@ impl Attrs {
     /// Borrow underlying Vec.
     pub fn items(&self) -> &Vec<Attr> {
         &self.0
+    }
+}
+
+impl From<std::fs::Metadata> for Attrs {
+    fn from(meta: std::fs::Metadata) -> Attrs {
+        Attrs::new().append("UNIX_MODE", meta.permissions().mode().to_string())
     }
 }
 
