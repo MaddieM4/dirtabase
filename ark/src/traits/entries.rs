@@ -36,21 +36,18 @@ where
             attrs.push(a);
         }
 
-        Self {
-            paths: paths,
-            attrs: attrs,
-            contents: contents,
-        }
+        Self(paths, attrs, contents)
     }
 }
 
 impl<C> From<Ark<C>> for Vec<(IPR, Attrs, Contents<C>)> {
     fn from(src: Ark<C>) -> Self {
-        let file_contents = src.contents.into_iter().map(|c| Contents::File(c));
+        let (paths, attrs, contents) = src.decompose();
+        let file_contents = contents.into_iter().map(|c| Contents::File(c));
         let dir_contents = std::iter::from_fn(move || Some(Contents::Dir));
         let contents = file_contents.chain(dir_contents);
 
-        zip(src.paths, src.attrs)
+        zip(paths, attrs)
             .zip(contents)
             .map(|((p, a), c)| (p, a, c))
             .collect()
@@ -67,9 +64,9 @@ mod test {
         // FROM
         let entries: Vec<(&str, Attrs, Contents<()>)> = vec![];
         let ark: Ark<()> = entries.into();
-        assert_eq!(ark.paths, vec![] as Vec::<IPR>);
-        assert_eq!(ark.attrs, vec![] as Vec::<Attrs>);
-        assert_eq!(ark.contents, vec![] as Vec::<()>);
+        assert_eq!(ark.paths(), &vec![] as &Vec::<IPR>);
+        assert_eq!(ark.attrs(), &vec![] as &Vec::<Attrs>);
+        assert_eq!(ark.contents(), &vec![] as &Vec::<()>);
 
         // TO
         let entries: Vec<(IPR, Attrs, Contents<()>)> = ark.into();
@@ -80,9 +77,9 @@ mod test {
     fn one_dir() {
         // FROM
         let ark: Ark<&'static str> = vec![("/hello", at! {HELLO => "world"}, Contents::Dir)].into();
-        assert_eq!(ark.paths, vec!["/hello"]);
-        assert_eq!(ark.attrs, vec![at! {HELLO => "world"}]);
-        assert_eq!(ark.contents, vec![] as Vec::<&'static str>);
+        assert_eq!(ark.paths(), &vec!["/hello"]);
+        assert_eq!(ark.attrs(), &vec![at! {HELLO => "world"}]);
+        assert_eq!(ark.contents(), &vec![] as &Vec::<&'static str>);
 
         // TO
         let entries: Vec<(IPR, Attrs, Contents<&str>)> = ark.into();
@@ -101,9 +98,9 @@ mod test {
             Contents::File("Some contents"),
         )]
         .into();
-        assert_eq!(ark.paths, vec!["/hello.txt"]);
-        assert_eq!(ark.attrs, vec![at! {HELLO => "with text"}]);
-        assert_eq!(ark.contents, vec!["Some contents"]);
+        assert_eq!(ark.paths(), &vec!["/hello.txt"]);
+        assert_eq!(ark.attrs(), &vec![at! {HELLO => "with text"}]);
+        assert_eq!(ark.contents(), &vec!["Some contents"]);
 
         // TO
         let entries: Vec<(IPR, Attrs, Contents<&str>)> = ark.into();
@@ -137,20 +134,23 @@ mod test {
 
         // Files before dirs, each sorted
         assert_eq!(
-            ark.paths,
-            vec!["/another/file.txt", "/hello.txt", "/another",]
+            ark.paths(),
+            &vec!["/another/file.txt", "/hello.txt", "/another"]
         );
 
         // Match order
         assert_eq!(
-            ark.attrs,
-            vec![
+            ark.attrs(),
+            &vec![
                 at! {ANOTHER => "file"},
                 at! {HELLO => "with text"},
                 at! {DIR => "yeah"},
             ]
         );
-        assert_eq!(ark.contents, vec!["Different contents", "Some contents",]);
+        assert_eq!(
+            ark.contents(),
+            &vec!["Different contents", "Some contents",]
+        );
 
         // TO
         let entries: Vec<(IPR, Attrs, Contents<&str>)> = ark.into();
@@ -186,9 +186,9 @@ mod test {
         .into();
 
         // Last item should win
-        assert_eq!(ark.paths, vec!["/x"]);
-        assert_eq!(ark.attrs, vec![at! { N => "6"}]);
-        assert_eq!(ark.contents, vec![] as Vec::<&str>);
+        assert_eq!(ark.paths(), &vec!["/x"]);
+        assert_eq!(ark.attrs(), &vec![at! { N => "6"}]);
+        assert_eq!(ark.contents(), &vec![] as &Vec::<&str>);
 
         // TO
         let entries: Vec<(IPR, Attrs, Contents<&str>)> = ark.into();

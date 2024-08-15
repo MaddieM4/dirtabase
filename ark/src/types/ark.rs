@@ -45,11 +45,11 @@ impl<C> Contents<C> {
 ///   - ark.attrs()
 ///   - ark.contents()
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Ark<C> {
-    pub(crate) paths: Vec<IPR>,
-    pub(crate) attrs: Vec<Attrs>,
-    pub(crate) contents: Vec<C>,
-}
+pub struct Ark<C>(
+    pub(crate) Vec<IPR>,
+    pub(crate) Vec<Attrs>,
+    pub(crate) Vec<C>,
+);
 
 impl<C> Ark<C> {
     /// Internal paths list.
@@ -61,7 +61,7 @@ impl<C> Ark<C> {
     ///  - All files come before all directories.
     ///  - Within each of those sections, paths are sorted.
     pub fn paths(&self) -> &Vec<IPR> {
-        &self.paths
+        &self.0
     }
 
     /// Internal attrs list.
@@ -71,7 +71,7 @@ impl<C> Ark<C> {
     ///  - This vector is length F+D.
     ///  - `ark.attrs()[N]` corresponds to `ark.paths()[N]`.
     pub fn attrs(&self) -> &Vec<Attrs> {
-        &self.attrs
+        &self.1
     }
 
     /// Internal contents list.
@@ -81,7 +81,7 @@ impl<C> Ark<C> {
     ///  - This vector is length F, not F+D.
     ///  - `ark.contents()[N]` corresponds to `ark.paths()[N]`.
     pub fn contents(&self) -> &Vec<C> {
-        &self.contents
+        &self.2
     }
 
     /// Slap together a new Ark from the constituent pieces.
@@ -90,11 +90,7 @@ impl<C> Ark<C> {
     pub fn compose(paths: Vec<IPR>, attrs: Vec<Attrs>, contents: Vec<C>) -> Self {
         assert!(paths.len() == attrs.len());
         assert!(paths.len() >= contents.len());
-        Self {
-            paths: paths,
-            attrs: attrs,
-            contents: contents,
-        }
+        Self(paths, attrs, contents)
     }
 
     /// Break an Ark into its constituent components, moving them.
@@ -103,7 +99,7 @@ impl<C> Ark<C> {
     /// memory while doing transformations. Usually you'll only care about
     /// transforming one, maybe two of the three channels.
     pub fn decompose(self) -> (Vec<IPR>, Vec<Attrs>, Vec<C>) {
-        (self.paths, self.attrs, self.contents)
+        (self.0, self.1, self.2)
     }
 
     /// Easy conversion by content type. Not quite automatic though.
@@ -113,7 +109,7 @@ impl<C> Ark<C> {
     {
         let (paths, attrs, contents) = src.decompose();
         let contents: Vec<C> = contents.into_iter().map(|t| t.into()).collect();
-        Self::compose(paths, attrs, contents)
+        Self(paths, attrs, contents)
     }
 }
 
