@@ -2,5 +2,6 @@
 
 pub mod entries;
 pub mod read;
+pub mod save;
 pub mod scan;
 pub mod translate;

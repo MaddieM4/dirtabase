@@ -30,9 +30,11 @@ dependencies = [
 name = "ark"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "lazy-regex",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
 ]
 
