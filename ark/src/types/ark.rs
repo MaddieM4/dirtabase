@@ -63,6 +63,11 @@ impl<C> Ark<C> {
         &self.2
     }
 
+    /// Number of entries in this Ark.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     /// Slap together a new Ark from the constituent pieces.
     ///
     /// Panics if length invariants aren't fulfilled.

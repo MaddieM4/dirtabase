@@ -15,6 +15,23 @@
 //! efficiently. Check out the [`crate::types::ark::Ark`] type for more detail.
 //!
 //! tl;dr It's like Virtual DOM but applied to directory data.
+//!
+//! ```
+//! use ::ark::*;
+//!
+//! // You can associate ANYTHING with files in an Ark as their content type.
+//! //
+//! // Seems kinda goofy to lead with a "what about integers" example, but
+//! // that freedom leads to good questions like, "what if those were file
+//! // sizes? And I was building a tool to free up disk space?"
+//! let ark = Ark::from_entries([
+//!     ("a/path", Contents::Dir),
+//!     ("a/path/to/a/file", Contents::File(34)),
+//!     ("another/file", Contents::File(910)),
+//! ]);
+//!
+//! assert_eq!(ark.len(), 3);
+//! ```
 
 pub mod traits;
 pub mod types;
