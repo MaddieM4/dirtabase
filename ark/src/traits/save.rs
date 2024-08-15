@@ -1,3 +1,4 @@
+//! Saves this Ark to the DB. Only works if the content is serializable.
 use crate::types::*;
 use std::io::Result;
 
