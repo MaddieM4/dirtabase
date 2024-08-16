@@ -1,3 +1,4 @@
+pub mod behavior;
 pub mod cli;
 pub mod context;
 pub mod doc;

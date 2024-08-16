@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+mod behavior;
 mod cli;
 mod context;
 mod doc;

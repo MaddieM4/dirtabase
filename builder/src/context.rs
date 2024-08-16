@@ -1,14 +1,14 @@
+use crate::behavior::exec_step;
 use crate::logger::Logger;
 use crate::op::Op;
 use ::ark::*;
 use serde::Serialize;
 use std::io::{self, Write};
-use std::path::Path;
 
 pub struct Context<'a> {
-    db: &'a DB,
-    log: &'a mut Logger,
-    stack: Vec<Digest>,
+    pub db: &'a DB,
+    pub log: &'a mut Logger,
+    pub stack: Vec<Digest>,
 }
 
 impl<'a> Context<'a> {
@@ -30,6 +30,10 @@ impl<'a> Context<'a> {
             self.apply(&op)?
         }
         Ok(())
+    }
+
+    pub fn push(&mut self, digest: Digest) {
+        self.stack.push(digest)
     }
 }
 
@@ -86,66 +90,11 @@ impl ReadyStep {
         )?;
 
         // TODO HERE: caching
-        let produced = self.apply_op(ctx)?;
-        ctx.stack.extend(produced);
+        exec_step(ctx, &self.0, &self.1)?;
 
         for digest in &ctx.stack {
             write!(ctx.log.stack(), "{}\n", digest.to_hex())?;
         }
-        Ok(())
-    }
-
-    pub fn apply_op(&self, ctx: &mut Context) -> io::Result<Vec<Digest>> {
-        let _consumed = &self.1;
-        let produced: Vec<Digest> = match &self.0 {
-            Op::Empty => {
-                vec![Ark::<&str>::empty().save(ctx.db)?]
-            }
-            Op::Import { base, targets } => targets
-                .iter()
-                .map(|path| {
-                    let real_dir = Path::new(&base).join(path);
-                    Ark::scan(real_dir)?.import(ctx.db)
-                })
-                .collect::<io::Result<Vec<Digest>>>()?,
-        };
-        Ok(produced)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::logger::vec_logger;
-
-    fn fixture_digest() -> Digest {
-        let db = DB::new_temp().expect("Temp DB");
-        let fixture_ark = Ark::scan("../fixture").expect("Scan fixture dir");
-        assert_eq!(fixture_ark.len(), 4);
-        let digest = fixture_ark.import(&db).expect("Imported to temp DB");
-        digest
-    }
-
-    #[test]
-    fn empty() -> std::io::Result<()> {
-        let db = DB::new_temp()?;
-        let mut log = vec_logger();
-        let mut ctx = Context::new(&db, &mut log);
-        ctx.apply(&Op::Empty)?;
-        assert_eq!(ctx.stack, vec![Ark::<&str>::empty().to_json()?.to_digest()]);
-        Ok(())
-    }
-
-    #[test]
-    fn import() -> std::io::Result<()> {
-        let db = DB::new_temp()?;
-        let mut log = vec_logger();
-        let mut ctx = Context::new(&db, &mut log);
-        ctx.apply(&Op::Import {
-            base: "..".into(),
-            targets: vec!["fixture".into()],
-        })?;
-        assert_eq!(ctx.stack, vec![fixture_digest()]);
         Ok(())
     }
 }
