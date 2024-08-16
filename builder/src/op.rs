@@ -1,4 +1,5 @@
 use serde::Serialize;
+use strum_macros::EnumIter;
 
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
@@ -6,8 +7,21 @@ pub enum ParseError {
     TooManyArgs { oc: OpCode, excess: usize },
     ArgBeforeFirstOp(String),
 }
+impl From<ParseError> for std::io::Error {
+    fn from(pe: ParseError) -> Self {
+        Self::other(match pe {
+            ParseError::MissingArg { oc, name } => format!("Op {:?} missing arg {}", oc, name),
+            ParseError::TooManyArgs { oc, excess } => {
+                format!("Op {:?} given {} too many arguments", oc, excess)
+            }
+            ParseError::ArgBeforeFirstOp(arg) => {
+                format!("Arg {:?} given before any operations", arg)
+            }
+        })
+    }
+}
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, EnumIter)]
 pub enum OpCode {
     Empty,
     Import,

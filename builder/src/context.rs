@@ -20,8 +20,16 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn apply(&mut self, op: &Op) -> std::io::Result<()> {
+    pub fn apply(&mut self, op: &Op) -> io::Result<()> {
         ReadyStep::from(op, &mut self.stack)?.apply(self)
+    }
+
+    pub fn parse_apply(&mut self, args: Vec<String>) -> io::Result<()> {
+        let pipeline = crate::op::parse_pipeline(args)?;
+        for op in pipeline {
+            self.apply(&op)?
+        }
+        Ok(())
     }
 }
 
@@ -68,13 +76,21 @@ impl ReadyStep {
     }
 
     pub fn apply(&self, ctx: &mut Context) -> io::Result<()> {
-        write!(ctx.log.opheader(), "Applying op: {:?}", self.0)?;
+        let sep = "================================================================";
+        write!(
+            ctx.log.opheader(),
+            "{}\n{:?}\n{}\n",
+            sep,
+            self.0.to_code(),
+            sep
+        )?;
+
         // TODO HERE: caching
         let produced = self.apply_op(ctx)?;
         ctx.stack.extend(produced);
 
         for digest in &ctx.stack {
-            write!(ctx.log.stack(), "{}", digest.to_hex())?;
+            write!(ctx.log.stack(), "{}\n", digest.to_hex())?;
         }
         Ok(())
     }
