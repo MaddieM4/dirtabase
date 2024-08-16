@@ -2,19 +2,33 @@
 use crate::types::*;
 use std::io::Result;
 
-pub trait Save: serde::Serialize {
+pub trait Save: ToJson {
     fn save(&self, db: &DB) -> Result<Digest> {
-        let json = serde_json::to_string(self)?;
-        let d = Digest::from(&json);
+        let json = self.to_json()?;
+        let d = json.to_digest();
         std::fs::write(db.join("cas").join(d.to_hex()), json)?;
         Ok(d)
     }
 }
 
-impl Save for Ark<&str> {}
-impl Save for Ark<String> {}
-impl Save for Ark<Vec<u8>> {}
-impl Save for Ark<Digest> {}
+pub trait ToJson: serde::Serialize {
+    fn to_json(&self) -> Result<String> {
+        Ok(serde_json::to_string(self)?)
+    }
+}
+
+impl<C> Save for Ark<C> where Ark<C>: ToJson {}
+impl<C> ToJson for Ark<C> where Ark<C>: serde::Serialize {}
+
+pub trait ToDigest {
+    fn to_digest(&self) -> Digest;
+}
+
+impl ToDigest for String {
+    fn to_digest(&self) -> Digest {
+        Digest::from(self)
+    }
+}
 
 #[cfg(test)]
 mod test {

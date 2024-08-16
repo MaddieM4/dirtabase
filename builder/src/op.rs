@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     MissingArg { oc: OpCode, name: &'static str },
@@ -11,7 +13,7 @@ pub enum OpCode {
     Import,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum Op {
     Empty,
     Import { base: String, targets: Vec<String> },
@@ -151,7 +153,7 @@ mod test {
         assert_eq!(
             parse_pipeline(["--empty", "oh", "no"]),
             Err(ParseError::TooManyArgs {
-                oc: OpCode::Import,
+                oc: OpCode::Empty,
                 excess: 2,
             })
         );
