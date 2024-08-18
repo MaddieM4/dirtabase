@@ -1,190 +1,67 @@
-use crate::archive::core::Triad;
+use crate::context::Context;
+use crate::doc::usage;
 use crate::logger::Logger;
-use crate::op::helpers::ctx;
-use indoc::indoc;
-use std::io::Write;
+use arkive::types::DB;
+use std::io::{Result, Write};
 use std::process::ExitCode;
 
-// TODO: Generate this based on docs from src/op/ops/*.rs
-const USAGE: &'static str = indoc! {"
-    usage: dirtabase [--help|--version|pipeline...]
-
-    A pipeline is made of one or more operations:
-
-    # Put an empty archive on the top of the stack
-     --empty
-
-    # Import external files into database (each param becomes an archive).
-     --import dir1 dir2 ... dirN
-
-    # Export files from the DB to the operating system.
-    # Consumes the last N archives on the stack, where N is the number of params.
-     --export .
-
-    # Merge all archives on the stack into one, consuming them.
-     --merge
-
-    # Filter an archive, keeping only the files where the path matches the pattern.
-     --filter '^/hello'
-     --filter 'x|y'
-
-    # Rename entries in an archive with a regex find and replace.
-     --replace 'foe' 'friend'
-     --replace '\\.([a-z]*)$' '.${1}.old'
-
-    # Rename entries in an archive, restricted to changing the START of paths.
-     --prefix 'overly/nested/' ''
-
-    # Unpack an archive to a tempdir, run a command there, and reimport the directory.
-     --cmd-impure 'echo \"some text\" > file.txt'
-"};
-
-/// What we decide to do based on CLI arguments
-#[derive(PartialEq, Debug)]
-pub enum Behavior {
-    Help,
-    Version,
-    UnexpectedArg(String),
-    Pipeline(Vec<String>),
+pub fn cli(args: Vec<String>, db: &DB, log: &mut Logger) -> Result<()> {
+    if args.is_empty() {
+        write!(log.stdout, "{}", usage())?;
+    }
+    Context::new(db, log).parse_apply(args)
 }
 
-pub fn parse<S>(args: impl Iterator<Item = S>) -> Behavior
-where
-    S: AsRef<str>,
-{
-    let mut pipeline_args: Vec<String> = vec![];
-    for arg in args {
-        match arg.as_ref() {
-            "--version" => return Behavior::Version,
-            "--help" => return Behavior::Help,
-            other => pipeline_args.push(other.to_owned()),
-        }
-    }
-
-    if pipeline_args.is_empty() {
-        Behavior::Help
-    } else {
-        Behavior::Pipeline(pipeline_args)
-    }
+fn infer_db() -> Result<DB> {
+    DB::new("./.dirtabase_db")
 }
 
-pub fn execute(behavior: Behavior, log: &mut Logger) -> ExitCode {
-    let result = match behavior {
-        Behavior::Help => write!(log.stdout, "{}", USAGE),
-        Behavior::Version => write!(log.stdout, "{}\n", env!("CARGO_PKG_VERSION")),
-        Behavior::UnexpectedArg(a) => write!(log.stdout, "Unexpected argument: {}\n", a),
-        Behavior::Pipeline(args) => execute_pipeline(args, log),
-    };
-    match result {
-        Ok(_) => ExitCode::SUCCESS,
-        Err(e) => {
-            write!(log.stdout, "Failed to execute: {:?}\n", e)
-                .expect("Failed to print failure msg");
-            ExitCode::from(1)
-        }
-    }
-}
-
-fn execute_pipeline(steps: Vec<String>, log: &mut Logger) -> std::io::Result<()> {
-    let store = crate::storage::Store::new_simple("./.dirtabase_db")?;
-    ctx(&store, log).parse_apply(steps)?;
-    Ok(())
+pub fn real_cli() -> ExitCode {
+    let db = infer_db().expect("Could not initialize DB");
+    let mut logger = Logger::new_real();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    cli(args, &db, &mut logger).expect("Pipeline failed");
+    ExitCode::SUCCESS
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use indoc::indoc;
 
     #[test]
-    fn parse_empty() {
-        assert_eq!(parse(Vec::<String>::new().iter()), Behavior::Help);
+    fn test_no_args() {
+        let db = DB::new_temp().expect("Temp DB");
+        let mut logger = Logger::new_vec();
+        let res = cli(vec![], &db, &mut logger);
+        let usage_txt = usage();
+
+        assert!(res.is_ok());
+        assert_eq!(logger.recorded(), (usage_txt.as_ref(), "",));
     }
 
     #[test]
-    fn parse_help() {
-        assert_eq!(parse(vec!["--help"].iter()), Behavior::Help);
-    }
+    fn test_pipeline() {
+        let db = DB::new_temp().expect("Temp DB");
+        let mut logger = Logger::new_vec();
+        let res = cli(
+            vec!["--import".into(), ".".into(), "fixture".into()],
+            &db,
+            &mut logger,
+        );
 
-    #[test]
-    fn parse_version() {
-        assert_eq!(parse(vec!["--version"].iter()), Behavior::Version);
-    }
-
-    #[test]
-    fn parse_conflict() {
-        assert_eq!(parse(vec!["--help", "--version"].iter()), Behavior::Help);
-        assert_eq!(parse(vec!["--version", "--help"].iter()), Behavior::Version);
-    }
-
-    #[test]
-    fn parse_pipelines() {
+        assert!(res.is_ok());
         assert_eq!(
-            parse(vec!["--import", "foo", "bar"].iter()),
-            Behavior::Pipeline(vec!["--import".into(), "foo".into(), "bar".into()])
+            logger.recorded(),
+            (
+                indoc! {"
+            ================================================================
+            Import
+            ================================================================
+            fb9dde674e4002c7646770fcdee7eb2669de2aa90b216f47331f7bd155d0f787
+        "},
+                ""
+            )
         );
-    }
-
-    #[test]
-    fn execute_help() {
-        let mut log = crate::logger::vec_logger();
-        execute(Behavior::Help, &mut log);
-        assert_eq!(log.stdout.recorded().unwrap(), USAGE);
-    }
-
-    #[test]
-    fn execute_version() {
-        let mut log = crate::logger::vec_logger();
-        execute(Behavior::Version, &mut log);
-        assert_eq!(
-            log.stdout.recorded().unwrap(),
-            env!("CARGO_PKG_VERSION").to_owned() + "\n"
-        );
-    }
-
-    #[test]
-    fn execute_unexpected_arg() {
-        let mut log = crate::logger::vec_logger();
-        execute(Behavior::UnexpectedArg("xyz".into()), &mut log);
-        assert_eq!(log.stdout.recorded().unwrap(), "Unexpected argument: xyz\n");
-    }
-
-    #[test]
-    fn execute_pipeline_import() {
-        let mut log = crate::logger::vec_logger();
-        execute(
-            Behavior::Pipeline(vec!["--import".into(), "./fixture".into()]),
-            &mut log,
-        );
-        assert_eq!(
-            log.stdout.recorded().unwrap(),
-            indoc! {"
-            --- Import ---
-            json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4
-        "}
-        );
-    }
-
-    #[test]
-    fn execute_pipeline_export() {
-        let mut log = crate::logger::vec_logger();
-        let dir = tempfile::tempdir().expect("Failed to create temporary directory");
-        execute(
-            Behavior::Pipeline(vec![
-                "--import".into(),
-                "./fixture".into(),
-                "--export".into(),
-                dir.path().to_str().unwrap().into(),
-            ]),
-            &mut log,
-        );
-        assert_eq!(
-            log.stdout.recorded().unwrap(),
-            indoc! {"
-            --- Import ---
-            json-plain-90d0cf810af44cbf7a5d24a9cca8bad6e3724606b28880890b8639da8ee6f7e4
-            --- Export ---
-        "}
-        );
-        assert!(dir.path().join("dir1/dir2/nested.txt").exists());
     }
 }

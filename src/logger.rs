@@ -99,6 +99,23 @@ impl Logger {
         }
     }
 
+    pub fn new_vec() -> Self {
+        Self::new(vec![], vec![])
+    }
+    pub fn new_real() -> Self {
+        Self::new(io::stdout(), io::stderr())
+    }
+
+    /// Only works with a vec logger. Will panic if used on real stdout/stderr.
+    ///
+    /// Useful for tests, which is the reason it exists!
+    pub fn recorded<'a>(&'a self) -> (&'a str, &'a str) {
+        (
+            self.stdout.recorded().unwrap(),
+            self.stderr.recorded().unwrap(),
+        )
+    }
+
     fn wb_for(&mut self, pol: Policy) -> &mut WriteBackend {
         match pol {
             Policy::Stdout => &mut self.stdout,
@@ -119,11 +136,11 @@ impl Logger {
 }
 
 pub fn vec_logger() -> Logger {
-    Logger::new(vec![], vec![])
+    Logger::new_vec()
 }
 
 pub fn real_logger() -> Logger {
-    Logger::new(io::stdout(), io::stderr())
+    Logger::new_real()
 }
 
 impl Default for Logger {

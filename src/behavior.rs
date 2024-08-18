@@ -1,6 +1,6 @@
 use crate::context::Context;
 use crate::op::Op;
-use ::ark::*;
+use arkive::*;
 use std::io::Result;
 use std::path::Path;
 
@@ -49,7 +49,7 @@ mod test {
 
     fn fixture_digest() -> Digest {
         let db = DB::new_temp().expect("Temp DB");
-        let fixture_ark = Ark::scan("../fixture").expect("Scan fixture dir");
+        let fixture_ark = Ark::scan("fixture").expect("Scan fixture dir");
         assert_eq!(fixture_ark.len(), 4);
         let digest = fixture_ark.import(&db).expect("Imported to temp DB");
         digest
@@ -73,7 +73,7 @@ mod test {
         exec_step(
             &mut ctx,
             &Op::Import {
-                base: "..".into(),
+                base: ".".into(),
                 targets: vec!["fixture".into()],
             },
             &vec![],

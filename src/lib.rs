@@ -1,12 +1,7 @@
-pub mod archive;
-pub mod ark;
-pub mod attr;
-pub mod build;
-pub mod db;
-pub mod digest;
-pub mod enc;
-pub mod label;
+pub mod behavior;
+pub mod cli;
+pub mod context;
+pub mod doc;
 pub mod logger;
 pub mod op;
-pub mod storage;
-pub mod stream;
+pub mod prelude;

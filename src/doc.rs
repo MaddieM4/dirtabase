@@ -77,7 +77,7 @@ pub fn usage() -> String {
 mod test {
     use super::*;
     use crate::logger::Logger;
-    use ::ark::*;
+    use arkive::*;
     use indoc::indoc;
     use rusty_fork::rusty_fork_test;
     use std::io::Result;
@@ -120,7 +120,7 @@ mod test {
         let db = DB::new(playground.path().join(".dirtabase_db"))?;
         let mut log = Logger::new_vec();
         let mut ctx = Context::new(&db, &mut log);
-        Ark::scan("../fixture")?.write(playground.path())?;
+        Ark::scan("fixture")?.write(playground.path())?;
 
         // Execute
         let original_dir = std::env::current_dir()?;

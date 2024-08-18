@@ -1,22 +1,11 @@
-#![allow(dead_code, unused_imports)]
-
-mod archive;
-mod attr;
+#![allow(dead_code)]
+mod behavior;
 mod cli;
-mod digest;
-mod enc;
-mod label;
+mod context;
+mod doc;
 mod logger;
 mod op;
-mod storage;
-mod stream;
 
-use std::env::args;
-use std::io;
-use std::process::ExitCode;
-
-fn main() -> ExitCode {
-    let mut log = logger::real_logger();
-    let behavior = cli::parse(args().skip(1));
-    cli::execute(behavior, &mut log)
+fn main() -> std::process::ExitCode {
+    crate::cli::real_cli()
 }
