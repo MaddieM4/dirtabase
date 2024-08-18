@@ -18,6 +18,30 @@ pub fn exec_step(ctx: &mut Context, op: &Op, _consumed: &Vec<Digest>) -> Result<
     })
 }
 
+// The flow API for contexts is tested in doc.rs.
+impl Context<'_> {
+    pub fn empty(&mut self) -> Result<&mut Self> {
+        self.apply(&Op::Empty)?;
+        Ok(self)
+    }
+
+    pub fn import<T, S>(&mut self, base: impl AsRef<str>, targets: T) -> Result<&mut Self>
+    where
+        T: Into<Vec<S>>,
+        S: AsRef<str>,
+    {
+        self.apply(&Op::Import {
+            base: base.as_ref().into(),
+            targets: targets
+                .into()
+                .iter()
+                .map(|s| s.as_ref().to_owned())
+                .collect(),
+        })?;
+        Ok(self)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
