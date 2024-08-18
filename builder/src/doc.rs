@@ -79,7 +79,7 @@ mod test {
     use crate::logger::Logger;
     use ::ark::*;
     use indoc::indoc;
-    use serial_test::serial;
+    use rusty_fork::rusty_fork_test;
     use std::io::Result;
 
     #[test]
@@ -135,33 +135,36 @@ mod test {
         })
     }
 
-    #[serial]
-    #[test]
-    fn test_examples() {
-        for oc in OpCode::iter() {
-            let examples = oc.doc().examples;
-            assert!(examples.len() > 0, "Opcode {:?} needs examples", oc);
+    rusty_fork_test! {
 
-            for example in examples {
-                assert_eq!(
-                    crate::op::parse_pipeline(example.as_txt),
-                    Ok(example.as_ops.clone()),
-                    "Example for {:?} has mismatching text and ops",
-                    oc
-                );
-                assert_eq!(
-                    try_example(example.as_ctx).expect("Example failed in as_ctx"),
-                    try_example(|ctx| {
-                        for op in &example.as_ops {
-                            ctx.apply(&op)?;
-                        }
-                        Ok(())
-                    })
-                    .expect("Example failed in as_ops"),
-                    "Example for {:?} has mismatching ctx and ops results",
-                    oc
-                );
+        #[test]
+        fn test_examples() {
+            for oc in OpCode::iter() {
+                let examples = oc.doc().examples;
+                assert!(examples.len() > 0, "Opcode {:?} needs examples", oc);
+
+                for example in examples {
+                    assert_eq!(
+                        crate::op::parse_pipeline(example.as_txt),
+                        Ok(example.as_ops.clone()),
+                        "Example for {:?} has mismatching text and ops",
+                        oc
+                    );
+                    assert_eq!(
+                        try_example(example.as_ctx).expect("Example failed in as_ctx"),
+                        try_example(|ctx| {
+                            for op in &example.as_ops {
+                                ctx.apply(&op)?;
+                            }
+                            Ok(())
+                        })
+                        .expect("Example failed in as_ops"),
+                        "Example for {:?} has mismatching ctx and ops results",
+                        oc
+                    );
+                }
             }
         }
+
     }
 }
