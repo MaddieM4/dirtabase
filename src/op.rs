@@ -25,12 +25,14 @@ impl From<ParseError> for std::io::Error {
 pub enum OpCode {
     Empty,
     Import,
+    Export,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub enum Op {
     Empty,
     Import { base: String, targets: Vec<String> },
+    Export(String),
 }
 
 impl OpCode {
@@ -48,6 +50,10 @@ impl OpCode {
                     targets: it.collect(),
                 })
             }
+            Self::Export => {
+                let dest = consume_param(self, "dest", &mut it)?;
+                Ok(Op::Export(dest))
+            }
         }
     }
 
@@ -55,6 +61,7 @@ impl OpCode {
         match arg {
             "--empty" => Some(Self::Empty),
             "--import" => Some(Self::Import),
+            "--export" => Some(Self::Export),
             _ => None,
         }
     }
@@ -65,6 +72,7 @@ impl Op {
         match self {
             Self::Empty => OpCode::Empty,
             Self::Import { .. } => OpCode::Import,
+            Self::Export(_) => OpCode::Export,
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::context::Context;
 use crate::op::{Op, OpCode};
+use std::path::Path;
 use strum::IntoEnumIterator;
 
 #[allow(dead_code)]
@@ -45,6 +46,26 @@ impl OpCode {
                     }],
                     as_ctx: &|ctx: &mut Context| {
                         ctx.import(".", ["dir1"])?;
+                        Ok(())
+                    },
+                }],
+            },
+            OpCode::Export => OpDoc {
+                flag: "--export",
+                args: " dest",
+                short: "Output an archive to an OS directory.",
+                examples: vec![ExamplePipeline {
+                    as_txt: vec!["--import", ".", "dir1", "--export", "./out"],
+                    as_ops: vec![
+                        Op::Import {
+                            base: ".".into(),
+                            targets: vec!["dir1".into()],
+                        },
+                        Op::Export("./out".into()),
+                    ],
+                    as_ctx: &|ctx: &mut Context| {
+                        ctx.import(".", ["dir1"])?.export("./out")?;
+                        assert!(Path::new("./out/dir1/dir2/nested.txt").exists());
                         Ok(())
                     },
                 }],

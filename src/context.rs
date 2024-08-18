@@ -43,6 +43,7 @@ impl Op {
         match self {
             Op::Empty => (0, 1),
             Op::Import { targets, .. } => (0, targets.len()),
+            Op::Export(_) => (1, 0),
         }
     }
 }

@@ -4,7 +4,17 @@ use arkive::*;
 use std::io::Result;
 use std::path::Path;
 
-pub fn exec_step(ctx: &mut Context, op: &Op, _consumed: &Vec<Digest>) -> Result<()> {
+// Todo: move into prefix op
+fn prefix_ark<C>(ark: Ark<C>, prefix: &str) -> Ark<C> {
+    let (p, a, c) = ark.decompose();
+    let p: Vec<IPR> = p
+        .iter()
+        .map(|ipr| (prefix.to_owned() + "/" + ipr.as_ref()).to_ipr())
+        .collect();
+    Ark::compose(std::rc::Rc::new(p), a, c)
+}
+
+pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<()> {
     Ok(match op {
         Op::Empty => {
             ctx.push(Ark::<&str>::empty().save(ctx.db)?);
@@ -12,8 +22,15 @@ pub fn exec_step(ctx: &mut Context, op: &Op, _consumed: &Vec<Digest>) -> Result<
         Op::Import { base, targets } => {
             for target in targets {
                 let real_dir = Path::new(&base).join(target);
-                ctx.push(Ark::scan(real_dir)?.import(ctx.db)?);
+                let ark = prefix_ark(Ark::scan(real_dir)?, target);
+                ctx.push(ark.import(ctx.db)?);
             }
+        }
+        Op::Export(base) => {
+            assert_eq!(consumed.len(), 1, "Export consumes 1 archive off the stack");
+            let digest = consumed[0];
+            let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
+            ark.write(ctx.db, Path::new(base))?;
         }
     })
 }
@@ -40,6 +57,11 @@ impl Context<'_> {
         })?;
         Ok(self)
     }
+
+    pub fn export(&mut self, dest: impl AsRef<str>) -> Result<&mut Self> {
+        self.apply(&Op::Export(dest.as_ref().to_owned()))?;
+        Ok(self)
+    }
 }
 
 #[cfg(test)]
@@ -49,7 +71,7 @@ mod test {
 
     fn fixture_digest() -> Digest {
         let db = DB::new_temp().expect("Temp DB");
-        let fixture_ark = Ark::scan("fixture").expect("Scan fixture dir");
+        let fixture_ark = prefix_ark(Ark::scan("fixture").expect("Scan fixture dir"), "fixture");
         assert_eq!(fixture_ark.len(), 4);
         let digest = fixture_ark.import(&db).expect("Imported to temp DB");
         digest
