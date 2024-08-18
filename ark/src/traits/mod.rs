@@ -6,5 +6,6 @@ pub mod read;
 pub mod save;
 pub mod scan;
 pub mod translate;
+pub mod write;
 
 pub use save::*;

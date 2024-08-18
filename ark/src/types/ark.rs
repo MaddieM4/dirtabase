@@ -68,6 +68,22 @@ impl<C> Ark<C> {
         self.0.len()
     }
 
+    /// Iterate the files in an Archive
+    pub fn files<'a>(&'a self) -> FileIterator<'a, C> {
+        FileIterator {
+            inner: &self,
+            pos: 0,
+        }
+    }
+
+    /// Iterate the dirs in an Archive
+    pub fn dirs<'a>(&'a self) -> DirIterator<'a, C> {
+        DirIterator {
+            inner: &self,
+            pos: self.0.len(),
+        }
+    }
+
     /// Slap together a new Ark from the constituent pieces.
     ///
     /// Panics if length invariants aren't fulfilled.
@@ -95,5 +111,92 @@ impl<C> Ark<C> {
     /// with Arks very easily.
     pub fn empty() -> Self {
         Self::compose(Rc::new(vec![]), Rc::new(vec![]), Rc::new(vec![]))
+    }
+}
+
+pub struct FileIterator<'a, C> {
+    inner: &'a Ark<C>,
+    pos: usize,
+}
+impl<'a, C> Iterator for FileIterator<'a, C> {
+    type Item = (&'a IPR, &'a Attrs, &'a C);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.inner.2.len() {
+            None
+        } else {
+            let pos = self.pos;
+            self.pos = pos + 1;
+            Some((&self.inner.0[pos], &self.inner.1[pos], &self.inner.2[pos]))
+        }
+    }
+}
+
+pub struct DirIterator<'a, C> {
+    inner: &'a Ark<C>,
+    pos: usize,
+}
+impl<'a, C> Iterator for DirIterator<'a, C> {
+    type Item = (&'a IPR, &'a Attrs);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos == 0 {
+            None
+        } else {
+            self.pos = self.pos - 1;
+            Some((&self.inner.0[self.pos], &self.inner.1[self.pos]))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::ipr::ToIPR;
+
+    #[test]
+    fn test_files() {
+        let ark = Ark::scan("../fixture").expect("Scanned fixture");
+        let mut files = ark.files();
+
+        // Sorted order
+        assert_eq!(
+            files.next(),
+            Some((
+                &"dir1/dir2/nested.txt".to_ipr(),
+                &Attrs::new().append("UNIX_MODE", "33204"),
+                &std::path::PathBuf::from("../fixture/dir1/dir2/nested.txt"),
+            ))
+        );
+        assert_eq!(
+            files.next(),
+            Some((
+                &"file_at_root.txt".to_ipr(),
+                &Attrs::new().append("UNIX_MODE", "33204"),
+                &std::path::PathBuf::from("../fixture/file_at_root.txt"),
+            ))
+        );
+    }
+
+    #[test]
+    fn test_dirs() {
+        let ark = Ark::scan("../fixture").expect("Scanned fixture");
+        let mut dirs = ark.dirs();
+
+        // Reverse sorted order.
+        //
+        // Consumers will often want to read these from most nested to least,
+        // because applying permissions in any other order can lock yourself
+        // out and make you unable to finish the job.
+        assert_eq!(
+            dirs.next(),
+            Some((
+                &"dir1/dir2".to_ipr(),
+                &Attrs::new().append("UNIX_MODE", "16893"),
+            ))
+        );
+        assert_eq!(
+            dirs.next(),
+            Some((&"dir1".to_ipr(), &Attrs::new().append("UNIX_MODE", "16893"),))
+        );
     }
 }

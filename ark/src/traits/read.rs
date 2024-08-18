@@ -24,7 +24,6 @@ impl Ark<PathBuf> {
     }
 }
 
-// TESTS TURNED OFF FOR NOW
 #[cfg(test)]
 mod test {
     use super::*;
