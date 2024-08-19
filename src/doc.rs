@@ -1,12 +1,9 @@
 use crate::context::Context;
 use crate::op::{Op, OpCode};
+use crate::test_tools::*;
 use arkive::Digest;
 use std::path::Path;
 use strum::IntoEnumIterator;
-
-const REPRODUCIBLE_URL: &str = "https://gist.githubusercontent.com/MaddieM4/92f0719922db5fbd60a12d762deca9ae/raw/37a4fe4d300b6a88913a808095fd52c1c356030a/reproducible.txt";
-const REPRODUCIBLE_DIGEST: &str =
-    "460f3d82bf451fbebd1958fe4714e2a82a6570dda19e0d6f39cd7504adca6088";
 
 #[allow(dead_code)]
 pub struct OpDoc {

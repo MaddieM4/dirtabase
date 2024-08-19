@@ -27,6 +27,7 @@ pub fn real_cli() -> ExitCode {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_tools::*;
     use indoc::indoc;
 
     #[test]
@@ -58,7 +59,50 @@ mod test {
             ================================================================
             Import
             ================================================================
+             + Can cache? false
+             + Is in cache? false
             8c958951d9f61be6a7b1ec48611710efc3d12ee71f3dc6ac34251afe4a95378e
+        "},
+                ""
+            )
+        );
+    }
+
+    #[test]
+    fn test_pipeline_caching() {
+        let db = DB::new_temp().expect("Temp DB");
+        let mut logger = Logger::new_vec();
+        let res = cli(
+            vec![
+                "--download".into(),
+                REPRODUCIBLE_URL.into(),
+                REPRODUCIBLE_DIGEST.into(),
+                "--download".into(),
+                REPRODUCIBLE_URL.into(),
+                REPRODUCIBLE_DIGEST.into(),
+            ],
+            &db,
+            &mut logger,
+        );
+
+        assert!(res.is_ok());
+        assert_eq!(
+            logger.recorded(),
+            (
+                indoc! {"
+            ================================================================
+            Download
+            ================================================================
+             + Can cache? true
+             + Is in cache? false
+            460f3d82bf451fbebd1958fe4714e2a82a6570dda19e0d6f39cd7504adca6088
+            ================================================================
+            Download
+            ================================================================
+             + Can cache? true
+             + Is in cache? true
+            460f3d82bf451fbebd1958fe4714e2a82a6570dda19e0d6f39cd7504adca6088
+            460f3d82bf451fbebd1958fe4714e2a82a6570dda19e0d6f39cd7504adca6088
         "},
                 ""
             )

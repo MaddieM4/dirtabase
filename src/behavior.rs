@@ -20,13 +20,6 @@ fn download(db: &DB, url: &str) -> Result<Digest> {
     let dir = tempfile::tempdir_in(db.join("tmp"))?;
     let mut resp = reqwest::blocking::get(url).map_err(|e| Error::other(e))?;
     let name = url_filename(url)?;
-    /*
-    let name: String = match resp.headers().get("Content-Disposition") {
-        Some(header) => todo!(),
-        None => url_filename(url)?,
-    };
-    */
-
     let dest = dir.path().join(name);
     resp.copy_to(&mut std::fs::File::create(dest)?)
         .map_err(|e| Error::other(e))?;
@@ -120,14 +113,7 @@ impl Context<'_> {
 mod test {
     use super::*;
     use crate::logger::Logger;
-
-    fn fixture_digest() -> Digest {
-        let db = DB::new_temp().expect("Temp DB");
-        let fixture_ark = prefix_ark(Ark::scan("fixture").expect("Scan fixture dir"), "fixture");
-        assert_eq!(fixture_ark.len(), 4);
-        let digest = fixture_ark.import(&db).expect("Imported to temp DB");
-        digest
-    }
+    use crate::test_tools::fixture_digest;
 
     #[test]
     fn empty() -> std::io::Result<()> {

@@ -73,8 +73,23 @@ impl ReadyStep {
         }
     }
 
+    pub fn cache_digests(&self, ctx: &mut Context) -> Option<Vec<Digest>> {
+        let key = self.cache_key();
+        let path = ctx.db.join("cache").join(key.to_hex());
+        if path.exists() {
+            let read = std::fs::read(path).expect("failed to read cache entry");
+            let s = String::from_utf8(read).expect("failed to interpret utf-8");
+            let d: Vec<Digest> = serde_json::from_str(&s).expect("failed to parse json");
+            Some(d)
+        } else {
+            None
+        }
+    }
     pub fn can_cache(&self) -> bool {
-        false
+        match self.0 {
+            Op::Download(_, _) => true,
+            _ => false,
+        }
     }
     pub fn cache_key(&self) -> Digest {
         serde_json::to_string(self)
@@ -92,8 +107,29 @@ impl ReadyStep {
             sep
         )?;
 
-        // TODO HERE: caching
-        exec_step(ctx, &self.0, &self.1)?;
+        let cache_digests = self.cache_digests(ctx);
+        let has_cache = cache_digests.is_some();
+        let can_cache = self.can_cache();
+        write!(
+            ctx.log.opheader(),
+            " + Can cache? {}\n + Is in cache? {}\n",
+            can_cache,
+            has_cache,
+        )?;
+
+        if has_cache {
+            ctx.stack.extend(cache_digests.unwrap());
+        } else {
+            exec_step(ctx, &self.0, &self.1)?;
+        }
+
+        if can_cache {
+            let n_produced = self.2;
+            let pos = &ctx.stack.len() - n_produced;
+            let produced_digests = &ctx.stack[pos..];
+            let cache_path = ctx.db.join("cache").join(self.cache_key().to_hex());
+            std::fs::write(cache_path, serde_json::to_string(produced_digests)?)?;
+        }
 
         for digest in &ctx.stack {
             write!(ctx.log.stack(), "{}\n", digest.to_hex())?;
