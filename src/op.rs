@@ -26,6 +26,7 @@ pub enum OpCode {
     Empty,
     Import,
     Export,
+    DownloadImpure,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -33,6 +34,7 @@ pub enum Op {
     Empty,
     Import { base: String, targets: Vec<String> },
     Export(String),
+    DownloadImpure(String),
 }
 
 impl OpCode {
@@ -54,6 +56,10 @@ impl OpCode {
                 let dest = consume_param(self, "dest", &mut it)?;
                 Ok(Op::Export(dest))
             }
+            Self::DownloadImpure => {
+                let url = consume_param(self, "url", &mut it)?;
+                Ok(Op::DownloadImpure(url))
+            }
         }
     }
 
@@ -62,6 +68,7 @@ impl OpCode {
             "--empty" => Some(Self::Empty),
             "--import" => Some(Self::Import),
             "--export" => Some(Self::Export),
+            "--download-impure" => Some(Self::DownloadImpure),
             _ => None,
         }
     }
@@ -73,6 +80,7 @@ impl Op {
             Self::Empty => OpCode::Empty,
             Self::Import { .. } => OpCode::Import,
             Self::Export(_) => OpCode::Export,
+            Self::DownloadImpure(_) => OpCode::DownloadImpure,
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::context::Context;
 use crate::op::Op;
 use arkive::*;
-use std::io::Result;
+use std::io::{Error, Result};
 use std::path::Path;
 
 // Todo: move into prefix op
@@ -12,6 +12,36 @@ fn prefix_ark<C>(ark: Ark<C>, prefix: &str) -> Ark<C> {
         .map(|ipr| (prefix.to_owned() + "/" + ipr.as_ref()).to_ipr())
         .collect();
     Ark::compose(std::rc::Rc::new(p), a, c)
+}
+
+/// Download a file and save it to the store.
+fn download(db: &DB, url: &str) -> Result<Digest> {
+    // TODO: db.tempdir()
+    let dir = tempfile::tempdir_in(db.join("tmp"))?;
+    let mut resp = reqwest::blocking::get(url).map_err(|e| Error::other(e))?;
+    let name = url_filename(url)?;
+    /*
+    let name: String = match resp.headers().get("Content-Disposition") {
+        Some(header) => todo!(),
+        None => url_filename(url)?,
+    };
+    */
+
+    let dest = dir.path().join(name);
+    resp.copy_to(&mut std::fs::File::create(dest)?)
+        .map_err(|e| Error::other(e))?;
+    Ark::scan(dir.path())?.import(db)
+}
+
+/// Derive a filename from parsing a URL.
+pub fn url_filename(given_url: &str) -> Result<String> {
+    let parsed_url = reqwest::Url::parse(&given_url).map_err(|e| Error::other(e))?;
+    Ok(parsed_url
+        .path_segments()
+        .ok_or(Error::other("Could not break URL into path segments"))?
+        .last()
+        .ok_or(Error::other("Could not determine filename"))?
+        .to_owned())
 }
 
 pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<()> {
@@ -31,6 +61,9 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
             let digest = consumed[0];
             let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
             ark.write(ctx.db, Path::new(base))?;
+        }
+        Op::DownloadImpure(url) => {
+            ctx.push(download(ctx.db, &url)?);
         }
     })
 }
@@ -60,6 +93,11 @@ impl Context<'_> {
 
     pub fn export(&mut self, dest: impl AsRef<str>) -> Result<&mut Self> {
         self.apply(&Op::Export(dest.as_ref().to_owned()))?;
+        Ok(self)
+    }
+
+    pub fn download_impure(&mut self, url: impl AsRef<str>) -> Result<&mut Self> {
+        self.apply(&Op::DownloadImpure(url.as_ref().to_owned()))?;
         Ok(self)
     }
 }

@@ -3,6 +3,8 @@ use crate::op::{Op, OpCode};
 use std::path::Path;
 use strum::IntoEnumIterator;
 
+const REPRODUCIBLE_URL: &str = "https://gist.githubusercontent.com/MaddieM4/92f0719922db5fbd60a12d762deca9ae/raw/37a4fe4d300b6a88913a808095fd52c1c356030a/reproducible.txt";
+
 #[allow(dead_code)]
 pub struct OpDoc {
     flag: &'static str,
@@ -66,6 +68,23 @@ impl OpCode {
                     as_ctx: &|ctx: &mut Context| {
                         ctx.import(".", ["dir1"])?.export("./out")?;
                         assert!(Path::new("./out/dir1/dir2/nested.txt").exists());
+                        Ok(())
+                    },
+                }],
+            },
+            OpCode::DownloadImpure => OpDoc {
+                flag: "--download-impure",
+                args: " url",
+                short: "Download a file without verifying its hash.",
+                examples: vec![ExamplePipeline {
+                    as_txt: vec!["--download-impure", REPRODUCIBLE_URL, "--export", "out"],
+                    as_ops: vec![
+                        Op::DownloadImpure(REPRODUCIBLE_URL.into()),
+                        Op::Export("out".into()),
+                    ],
+                    as_ctx: &|ctx: &mut Context| {
+                        ctx.download_impure(REPRODUCIBLE_URL)?.export("out")?;
+                        assert!(Path::new("./out/reproducible.txt").exists());
                         Ok(())
                     },
                 }],
