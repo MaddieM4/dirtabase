@@ -39,11 +39,12 @@ impl<'a> Context<'a> {
 
 impl Op {
     /// How many stack items will this step consume and produce?
-    pub fn stats(&self, _stack_size: usize) -> (usize, usize) {
+    pub fn stats(&self, stack_size: usize) -> (usize, usize) {
         match self {
             Op::Empty => (0, 1),
             Op::Import { targets, .. } => (0, targets.len()),
             Op::Export(_) => (1, 0),
+            Op::Merge => (stack_size, 1),
             Op::Download(_, _) => (0, 1),
             Op::DownloadImpure(_) => (0, 1),
         }

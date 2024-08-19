@@ -41,13 +41,13 @@ impl OpCode {
                 args: " base [target...]",
                 short: "Copy directories into the DB as archives.",
                 examples: vec![ExamplePipeline {
-                    as_txt: vec!["--import", ".", "dir1"],
+                    as_txt: vec!["--import", ".", "fixture"],
                     as_ops: vec![Op::Import {
                         base: ".".into(),
-                        targets: vec!["dir1".into()],
+                        targets: vec!["fixture".into()],
                     }],
                     as_ctx: &|ctx: &mut Context| {
-                        ctx.import(".", ["dir1"])?;
+                        ctx.import(".", ["fixture"])?;
                         Ok(())
                     },
                 }],
@@ -57,17 +57,43 @@ impl OpCode {
                 args: " dest",
                 short: "Output an archive to an OS directory.",
                 examples: vec![ExamplePipeline {
-                    as_txt: vec!["--import", ".", "dir1", "--export", "./out"],
+                    as_txt: vec!["--import", ".", "fixture", "--export", "./out"],
                     as_ops: vec![
                         Op::Import {
                             base: ".".into(),
-                            targets: vec!["dir1".into()],
+                            targets: vec!["fixture".into()],
                         },
                         Op::Export("./out".into()),
                     ],
                     as_ctx: &|ctx: &mut Context| {
-                        ctx.import(".", ["dir1"])?.export("./out")?;
-                        assert!(Path::new("./out/dir1/dir2/nested.txt").exists());
+                        ctx.import(".", ["fixture"])?.export("./out")?;
+                        assert!(Path::new("./out/fixture/dir1/dir2/nested.txt").exists());
+                        Ok(())
+                    },
+                }],
+            },
+            OpCode::Merge => OpDoc {
+                flag: "--merge",
+                args: "",
+                short: "Merge all archives on the stack into one.",
+                examples: vec![ExamplePipeline {
+                    as_txt: vec![
+                        "--import", ".", "fixture", "src", "--merge", "--export", "./out",
+                    ],
+                    as_ops: vec![
+                        Op::Import {
+                            base: ".".into(),
+                            targets: vec!["fixture".into(), "src".into()],
+                        },
+                        Op::Merge,
+                        Op::Export("./out".into()),
+                    ],
+                    as_ctx: &|ctx: &mut Context| {
+                        ctx.import(".", ["fixture", "src"])?
+                            .merge()?
+                            .export("./out")?;
+                        assert!(Path::new("./out/fixture/dir1/dir2/nested.txt").exists());
+                        assert!(Path::new("./out/src/doc.rs").exists());
                         Ok(())
                     },
                 }],
@@ -134,8 +160,15 @@ pub fn usage() -> String {
             "\n    Usage: ",
             doc.flag,
             doc.args,
-            "\n\n",
+            "\n    Examples:\n",
         ]);
+        for example in doc.examples {
+            sections.push("      dirtabase");
+            for arg in example.as_txt {
+                sections.extend([" ", arg]);
+            }
+            sections.push("\n\n");
+        }
     }
     sections.concat()
 }
@@ -159,9 +192,13 @@ mod test {
 
             --empty: Push an empty archive to the stack.
                 Usage: --empty
+                Examples:
+                  dirtabase --empty
 
             --import: Copy directories into the DB as archives.
                 Usage: --import base [target...]
+                Examples:
+                  dirtabase --import . fixture
         "}),
             "Got: {:?}",
             usage()
@@ -187,7 +224,8 @@ mod test {
         let db = DB::new(playground.path().join(".dirtabase_db"))?;
         let mut log = Logger::new_vec();
         let mut ctx = Context::new(&db, &mut log);
-        Ark::scan("fixture")?.write(playground.path())?;
+        Ark::scan("fixture")?.write(playground.path().join("fixture"))?;
+        Ark::scan("src")?.write(playground.path().join("src"))?;
 
         // Execute
         let original_dir = std::env::current_dir()?;

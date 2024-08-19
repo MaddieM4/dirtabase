@@ -35,6 +35,7 @@ pub enum OpCode {
     Empty,
     Import,
     Export,
+    Merge,
     Download,
     DownloadImpure,
 }
@@ -44,6 +45,7 @@ pub enum Op {
     Empty,
     Import { base: String, targets: Vec<String> },
     Export(String),
+    Merge,
     Download(String, Digest),
     DownloadImpure(String),
 }
@@ -67,6 +69,10 @@ impl OpCode {
                 let dest = consume_param(self, "dest", &mut it)?;
                 Ok(Op::Export(dest))
             }
+            Self::Merge => {
+                no_further_params(self, &mut it)?;
+                Ok(Op::Merge)
+            }
             Self::Download => {
                 let url = consume_param(self, "url", &mut it)?;
                 let hash = consume_param(self, "hash", &mut it)?;
@@ -86,6 +92,7 @@ impl OpCode {
             "--empty" => Some(Self::Empty),
             "--import" => Some(Self::Import),
             "--export" => Some(Self::Export),
+            "--merge" => Some(Self::Merge),
             "--download" => Some(Self::Download),
             "--download-impure" => Some(Self::DownloadImpure),
             _ => None,
@@ -99,6 +106,7 @@ impl Op {
             Self::Empty => OpCode::Empty,
             Self::Import { .. } => OpCode::Import,
             Self::Export(_) => OpCode::Export,
+            Self::Merge => OpCode::Merge,
             Self::Download(_, _) => OpCode::Download,
             Self::DownloadImpure(_) => OpCode::DownloadImpure,
         }

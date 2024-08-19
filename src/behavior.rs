@@ -55,6 +55,20 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
             let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
             ark.write(ctx.db, Path::new(base))?;
         }
+        Op::Merge => {
+            let arks: Result<Vec<Ark<Digest>>> = consumed
+                .iter()
+                .map(|digest| Ark::load(ctx.db, digest))
+                .collect();
+
+            let ark = Ark::from_entries(
+                arks?
+                    .into_iter()
+                    .flat_map(|ark| ark.to_entries())
+                    .collect::<Vec<(IPR, Attrs, Contents<Digest>)>>(),
+            );
+            ctx.push(ark.save(ctx.db)?);
+        }
         Op::Download(url, digest_expected) => {
             let digest = download(ctx.db, &url)?;
             if digest != *digest_expected {
@@ -93,6 +107,11 @@ impl Context<'_> {
 
     pub fn export(&mut self, dest: impl AsRef<str>) -> Result<&mut Self> {
         self.apply(&Op::Export(dest.as_ref().to_owned()))?;
+        Ok(self)
+    }
+
+    pub fn merge(&mut self) -> Result<&mut Self> {
+        self.apply(&Op::Merge)?;
         Ok(self)
     }
 

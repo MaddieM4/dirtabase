@@ -9,12 +9,12 @@ processes. It's going to be the backbone of the `layover` package manager.
 ```bash
 # Run this command in this repo!
 $ dirtabase \
-  --import src fixture \
+  --import . src fixture \
   --merge \
   --prefix '' misc/ \
   --cmd-impure 'find misc -type f | xargs md5sum > sums' \
   --filter '^/sums' \
-  --export out
+  --export out // TODO: make atomic replace again
 ```
 
 Here's what it'd output:
@@ -75,7 +75,7 @@ output stream format of `dirtabase` Operators.
 
 This repo is equipped to use [devenv.sh](https://devenv.sh/), which is [pretty
 easy](https://devenv.sh/getting-started/#installation) to get set up. It also
-integrates nicely with [direnv](https://devenv.sh/automatic-shell-activation/). 
+integrates nicely with [direnv](https://devenv.sh/automatic-shell-activation/).
 
 ```bash
 # These commands should work after setup!
