@@ -9,6 +9,7 @@ fn main() -> Result<()> {
             "515af14bc425dac9b5368792b287ebbb3b973e435be80676b4db9789ef71b4c1",
         )?
         .cmd_impure("tar xf gianas-return-v.latest-linux.tar.gz")?
+        .filter("^giana/")?
         .export("out")?;
     Ok(())
 }

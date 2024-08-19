@@ -46,6 +46,7 @@ impl Op {
             Op::Export(_) => (1, 0),
             Op::Merge => (stack_size, 1),
             Op::Prefix(_) => (1, 1),
+            Op::Filter(_) => (1, 1),
             Op::Download(_, _) => (0, 1),
             Op::DownloadImpure(_) => (0, 1),
             Op::CmdImpure(_) => (1, 1),

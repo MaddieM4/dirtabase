@@ -13,8 +13,8 @@ $ dirtabase \
   --merge \
   --prefix misc \
   --cmd-impure 'find misc -type f | xargs md5sum > sums' \
-  --filter '^/sums' \
-  --export out // TODO: make atomic replace again
+  --filter '^sums' \
+  --export out
 ```
 
 Here's what it'd output:

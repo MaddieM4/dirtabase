@@ -123,6 +123,32 @@ impl OpCode {
                     },
                 }],
             },
+            OpCode::Filter => OpDoc {
+                flag: "--filter",
+                args: " pattern",
+                short: "Exclude files and directories where the path doesn't match a regex.",
+                examples: vec![ExamplePipeline {
+                    as_txt: vec![
+                        "--import", ".", "fixture", "--filter", "root", "--export", "./out",
+                    ],
+                    as_ops: vec![
+                        Op::Import {
+                            base: ".".into(),
+                            targets: vec!["fixture".into()],
+                        },
+                        Op::Filter("root".into()),
+                        Op::Export("./out".into()),
+                    ],
+                    as_ctx: &|ctx: &mut Context| {
+                        ctx.import(".", ["fixture"])?
+                            .filter("root")?
+                            .export("./out")?;
+                        assert!(!Path::new("./out/fixture/dir1/dir2/nested.txt").exists());
+                        assert!(Path::new("./out/fixture/file_at_root.txt").exists());
+                        Ok(())
+                    },
+                }],
+            },
             OpCode::Download => OpDoc {
                 flag: "--download",
                 args: " url digest",

@@ -117,6 +117,20 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
             let ark = Ark::compose(std::rc::Rc::new(p), a, c);
             ctx.push(ark.save(ctx.db)?)
         }
+        Op::Filter(pattern) => {
+            assert_eq!(consumed.len(), 1, "Filter consumes 1 archive off the stack");
+            let digest = consumed[0];
+            let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
+
+            let re = regex::Regex::new(pattern).map_err(|e| Error::other(e))?;
+            let entries: Vec<(IPR, Attrs, Contents<Digest>)> = ark
+                .to_entries()
+                .into_iter()
+                .filter(|(p, _, _)| re.is_match(p.as_ref()))
+                .collect();
+            let ark = Ark::from_entries(entries);
+            ctx.push(ark.save(ctx.db)?)
+        }
         Op::Download(url, digest_expected) => {
             let digest = download(ctx.db, &url)?;
             if digest != *digest_expected {
@@ -175,6 +189,11 @@ impl Context<'_> {
 
     pub fn prefix(&mut self, prefix: impl AsRef<str>) -> Result<&mut Self> {
         self.apply(&Op::Prefix(prefix.as_ref().to_owned()))?;
+        Ok(self)
+    }
+
+    pub fn filter(&mut self, pattern: impl AsRef<str>) -> Result<&mut Self> {
+        self.apply(&Op::Filter(pattern.as_ref().to_owned()))?;
         Ok(self)
     }
 
