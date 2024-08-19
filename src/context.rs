@@ -48,6 +48,7 @@ impl Op {
             Op::Prefix(_) => (1, 1),
             Op::Download(_, _) => (0, 1),
             Op::DownloadImpure(_) => (0, 1),
+            Op::CmdImpure(_) => (1, 1),
         }
     }
 }

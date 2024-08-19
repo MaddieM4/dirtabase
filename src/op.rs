@@ -39,6 +39,7 @@ pub enum OpCode {
     Prefix,
     Download,
     DownloadImpure,
+    CmdImpure,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -50,6 +51,7 @@ pub enum Op {
     Prefix(String),
     Download(String, Digest),
     DownloadImpure(String),
+    CmdImpure(String),
 }
 
 impl OpCode {
@@ -94,6 +96,11 @@ impl OpCode {
                 no_further_params(self, &mut it)?;
                 Ok(Op::DownloadImpure(url))
             }
+            Self::CmdImpure => {
+                let cmd = consume_param(self, "cmd", &mut it)?;
+                no_further_params(self, &mut it)?;
+                Ok(Op::CmdImpure(cmd))
+            }
         }
     }
 
@@ -106,6 +113,7 @@ impl OpCode {
             "--prefix" => Some(Self::Prefix),
             "--download" => Some(Self::Download),
             "--download-impure" => Some(Self::DownloadImpure),
+            "--cmd-impure" => Some(Self::CmdImpure),
             _ => None,
         }
     }
@@ -121,6 +129,7 @@ impl Op {
             Self::Prefix(_) => OpCode::Prefix,
             Self::Download(_, _) => OpCode::Download,
             Self::DownloadImpure(_) => OpCode::DownloadImpure,
+            Self::CmdImpure(_) => OpCode::CmdImpure,
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::context::Context;
 use crate::op::Op;
 use arkive::*;
-use std::io::{Error, Result};
+use std::io::{Error, Result, Write};
 use std::path::Path;
 
 // Todo: move into prefix op
@@ -35,6 +35,37 @@ pub fn url_filename(given_url: &str) -> Result<String> {
         .last()
         .ok_or(Error::other("Could not determine filename"))?
         .to_owned())
+}
+
+/// Run a command in a way that includes your normal shell environment
+pub fn command(ctx: &mut Context, digest: &Digest, cmd: &str) -> Result<Digest> {
+    // Extract to temporary directory
+    let dir = tempfile::tempdir()?;
+    let ark: Ark<Digest> = Ark::load(ctx.db, digest)?;
+    ark.write(ctx.db, dir.path())?;
+
+    // Run the command
+    // Equivalent to: bash -o pipefail -e -c '...'
+    write!(ctx.log.cmd(), "--- [{}] ---\n", cmd)?;
+    let status = std::process::Command::new("bash")
+        .arg("-o")
+        .arg("pipefail")
+        .arg("-e")
+        .arg("-c")
+        .arg(cmd)
+        .current_dir(&dir)
+        .status()?;
+
+    if !&status.success() {
+        return Err(Error::other(format!(
+            "Command {:?} failed with status {:?}",
+            cmd,
+            status.code().unwrap()
+        )));
+    }
+
+    // Re-import directory back into a new stored archive
+    Ark::scan(dir.path())?.import(ctx.db)
 }
 
 pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<()> {
@@ -96,6 +127,16 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
         Op::DownloadImpure(url) => {
             ctx.push(download(ctx.db, &url)?);
         }
+        Op::CmdImpure(cmd) => {
+            assert_eq!(
+                consumed.len(),
+                1,
+                "CmdImpure consumes 1 archive off the stack"
+            );
+            let digest = consumed[0];
+            let produced = command(ctx, &digest, &cmd)?;
+            ctx.push(produced);
+        }
     })
 }
 
@@ -146,6 +187,11 @@ impl Context<'_> {
 
     pub fn download_impure(&mut self, url: impl AsRef<str>) -> Result<&mut Self> {
         self.apply(&Op::DownloadImpure(url.as_ref().to_owned()))?;
+        Ok(self)
+    }
+
+    pub fn cmd_impure(&mut self, cmd: impl AsRef<str>) -> Result<&mut Self> {
+        self.apply(&Op::CmdImpure(cmd.as_ref().to_owned()))?;
         Ok(self)
     }
 }

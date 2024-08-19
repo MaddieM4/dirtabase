@@ -167,6 +167,24 @@ impl OpCode {
                     },
                 }],
             },
+            OpCode::CmdImpure => OpDoc {
+                flag: "--cmd-impure",
+                args: " cmd",
+                short: "Run a command within the top archive on the stack..",
+                examples: vec![ExamplePipeline {
+                    as_txt: vec!["--empty", "--cmd-impure", "touch grass", "--export", "out"],
+                    as_ops: vec![
+                        Op::Empty,
+                        Op::CmdImpure("touch grass".into()),
+                        Op::Export("out".into()),
+                    ],
+                    as_ctx: &|ctx: &mut Context| {
+                        ctx.empty()?.cmd_impure("touch grass")?.export("out")?;
+                        assert!(Path::new("./out/grass").exists());
+                        Ok(())
+                    },
+                }],
+            },
         }
     }
 }
