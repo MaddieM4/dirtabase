@@ -98,6 +98,31 @@ impl OpCode {
                     },
                 }],
             },
+            OpCode::Prefix => OpDoc {
+                flag: "--prefix",
+                args: " prefix",
+                short: "Add a prefix to all paths in the top archive on the stack.",
+                examples: vec![ExamplePipeline {
+                    as_txt: vec![
+                        "--import", ".", "fixture", "--prefix", "foo", "--export", "./out",
+                    ],
+                    as_ops: vec![
+                        Op::Import {
+                            base: ".".into(),
+                            targets: vec!["fixture".into()],
+                        },
+                        Op::Prefix("foo".into()),
+                        Op::Export("./out".into()),
+                    ],
+                    as_ctx: &|ctx: &mut Context| {
+                        ctx.import(".", ["fixture"])?
+                            .prefix("foo")?
+                            .export("./out")?;
+                        assert!(Path::new("./out/foo/fixture/dir1/dir2/nested.txt").exists());
+                        Ok(())
+                    },
+                }],
+            },
             OpCode::Download => OpDoc {
                 flag: "--download",
                 args: " url digest",

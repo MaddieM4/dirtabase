@@ -69,6 +69,23 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
             );
             ctx.push(ark.save(ctx.db)?);
         }
+        Op::Prefix(prefix) => {
+            assert_eq!(consumed.len(), 1, "Export consumes 1 archive off the stack");
+            let digest = consumed[0];
+            let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
+
+            let prefix = prefix.to_ipr();
+            let (p, a, c) = ark.decompose();
+            let p: Vec<IPR> = p
+                .iter()
+                .map(|path| {
+                    let combined = prefix.as_ref().to_owned() + "/" + path.as_ref();
+                    combined.into()
+                })
+                .collect();
+            let ark = Ark::compose(std::rc::Rc::new(p), a, c);
+            ctx.push(ark.save(ctx.db)?)
+        }
         Op::Download(url, digest_expected) => {
             let digest = download(ctx.db, &url)?;
             if digest != *digest_expected {
@@ -112,6 +129,11 @@ impl Context<'_> {
 
     pub fn merge(&mut self) -> Result<&mut Self> {
         self.apply(&Op::Merge)?;
+        Ok(self)
+    }
+
+    pub fn prefix(&mut self, prefix: impl AsRef<str>) -> Result<&mut Self> {
+        self.apply(&Op::Prefix(prefix.as_ref().to_owned()))?;
         Ok(self)
     }
 

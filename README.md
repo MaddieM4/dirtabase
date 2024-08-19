@@ -11,7 +11,7 @@ processes. It's going to be the backbone of the `layover` package manager.
 $ dirtabase \
   --import . src fixture \
   --merge \
-  --prefix '' misc/ \
+  --prefix misc \
   --cmd-impure 'find misc -type f | xargs md5sum > sums' \
   --filter '^/sums' \
   --export out // TODO: make atomic replace again

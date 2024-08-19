@@ -36,6 +36,7 @@ pub enum OpCode {
     Import,
     Export,
     Merge,
+    Prefix,
     Download,
     DownloadImpure,
 }
@@ -46,6 +47,7 @@ pub enum Op {
     Import { base: String, targets: Vec<String> },
     Export(String),
     Merge,
+    Prefix(String),
     Download(String, Digest),
     DownloadImpure(String),
 }
@@ -67,21 +69,29 @@ impl OpCode {
             }
             Self::Export => {
                 let dest = consume_param(self, "dest", &mut it)?;
+                no_further_params(self, &mut it)?;
                 Ok(Op::Export(dest))
             }
             Self::Merge => {
                 no_further_params(self, &mut it)?;
                 Ok(Op::Merge)
             }
+            Self::Prefix => {
+                let prefix = consume_param(self, "prefix", &mut it)?;
+                no_further_params(self, &mut it)?;
+                Ok(Op::Prefix(prefix))
+            }
             Self::Download => {
                 let url = consume_param(self, "url", &mut it)?;
                 let hash = consume_param(self, "hash", &mut it)?;
+                no_further_params(self, &mut it)?;
                 let digest =
                     Digest::from_hex(&hash).map_err(|e| ParseError::InvalidDigest(hash, e))?;
                 Ok(Op::Download(url, digest))
             }
             Self::DownloadImpure => {
                 let url = consume_param(self, "url", &mut it)?;
+                no_further_params(self, &mut it)?;
                 Ok(Op::DownloadImpure(url))
             }
         }
@@ -93,6 +103,7 @@ impl OpCode {
             "--import" => Some(Self::Import),
             "--export" => Some(Self::Export),
             "--merge" => Some(Self::Merge),
+            "--prefix" => Some(Self::Prefix),
             "--download" => Some(Self::Download),
             "--download-impure" => Some(Self::DownloadImpure),
             _ => None,
@@ -107,6 +118,7 @@ impl Op {
             Self::Import { .. } => OpCode::Import,
             Self::Export(_) => OpCode::Export,
             Self::Merge => OpCode::Merge,
+            Self::Prefix(_) => OpCode::Prefix,
             Self::Download(_, _) => OpCode::Download,
             Self::DownloadImpure(_) => OpCode::DownloadImpure,
         }
