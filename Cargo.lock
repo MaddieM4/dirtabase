@@ -172,6 +172,7 @@ name = "dirtabase"
 version = "0.1.0"
 dependencies = [
  "arkive",
+ "hex",
  "indoc",
  "reqwest",
  "rusty-fork",

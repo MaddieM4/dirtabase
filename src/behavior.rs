@@ -62,6 +62,13 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
             let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
             ark.write(ctx.db, Path::new(base))?;
         }
+        Op::Download(url, digest_expected) => {
+            let digest = download(ctx.db, &url)?;
+            if digest != *digest_expected {
+                return Err(Error::other("Hash check failed"));
+            }
+            ctx.push(digest);
+        }
         Op::DownloadImpure(url) => {
             ctx.push(download(ctx.db, &url)?);
         }
@@ -93,6 +100,13 @@ impl Context<'_> {
 
     pub fn export(&mut self, dest: impl AsRef<str>) -> Result<&mut Self> {
         self.apply(&Op::Export(dest.as_ref().to_owned()))?;
+        Ok(self)
+    }
+
+    pub fn download(&mut self, url: impl AsRef<str>, hash: impl AsRef<str>) -> Result<&mut Self> {
+        let digest = Digest::from_hex(hash.as_ref())
+            .map_err(|e| crate::op::ParseError::InvalidDigest(hash.as_ref().to_owned(), e))?;
+        self.apply(&Op::Download(url.as_ref().to_owned(), digest))?;
         Ok(self)
     }
 

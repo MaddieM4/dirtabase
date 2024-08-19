@@ -44,6 +44,7 @@ impl Op {
             Op::Empty => (0, 1),
             Op::Import { targets, .. } => (0, targets.len()),
             Op::Export(_) => (1, 0),
+            Op::Download(_, _) => (0, 1),
             Op::DownloadImpure(_) => (0, 1),
         }
     }

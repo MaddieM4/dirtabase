@@ -1,3 +1,5 @@
+use arkive::Digest;
+use hex::FromHexError;
 use serde::Serialize;
 use strum_macros::EnumIter;
 
@@ -6,6 +8,7 @@ pub enum ParseError {
     MissingArg { oc: OpCode, name: &'static str },
     TooManyArgs { oc: OpCode, excess: usize },
     ArgBeforeFirstOp(String),
+    InvalidDigest(String, FromHexError),
 }
 impl From<ParseError> for std::io::Error {
     fn from(pe: ParseError) -> Self {
@@ -17,6 +20,12 @@ impl From<ParseError> for std::io::Error {
             ParseError::ArgBeforeFirstOp(arg) => {
                 format!("Arg {:?} given before any operations", arg)
             }
+            ParseError::InvalidDigest(arg, err) => {
+                format!(
+                    "Arg {:?} could not be parsed as a hex digest: {:?}",
+                    arg, err
+                )
+            }
         })
     }
 }
@@ -26,6 +35,7 @@ pub enum OpCode {
     Empty,
     Import,
     Export,
+    Download,
     DownloadImpure,
 }
 
@@ -34,6 +44,7 @@ pub enum Op {
     Empty,
     Import { base: String, targets: Vec<String> },
     Export(String),
+    Download(String, Digest),
     DownloadImpure(String),
 }
 
@@ -56,6 +67,13 @@ impl OpCode {
                 let dest = consume_param(self, "dest", &mut it)?;
                 Ok(Op::Export(dest))
             }
+            Self::Download => {
+                let url = consume_param(self, "url", &mut it)?;
+                let hash = consume_param(self, "hash", &mut it)?;
+                let digest =
+                    Digest::from_hex(&hash).map_err(|e| ParseError::InvalidDigest(hash, e))?;
+                Ok(Op::Download(url, digest))
+            }
             Self::DownloadImpure => {
                 let url = consume_param(self, "url", &mut it)?;
                 Ok(Op::DownloadImpure(url))
@@ -68,6 +86,7 @@ impl OpCode {
             "--empty" => Some(Self::Empty),
             "--import" => Some(Self::Import),
             "--export" => Some(Self::Export),
+            "--download" => Some(Self::Download),
             "--download-impure" => Some(Self::DownloadImpure),
             _ => None,
         }
@@ -80,6 +99,7 @@ impl Op {
             Self::Empty => OpCode::Empty,
             Self::Import { .. } => OpCode::Import,
             Self::Export(_) => OpCode::Export,
+            Self::Download(_, _) => OpCode::Download,
             Self::DownloadImpure(_) => OpCode::DownloadImpure,
         }
     }
