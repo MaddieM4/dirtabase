@@ -37,6 +37,7 @@ pub enum OpCode {
     Export,
     Merge,
     Prefix,
+    Rename,
     Filter,
     Download,
     DownloadImpure,
@@ -51,6 +52,7 @@ pub enum Op {
     Merge,
     Prefix(String),
     Filter(String),
+    Rename(String, String),
     Download(String, Digest),
     DownloadImpure(String),
     CmdImpure(String),
@@ -90,6 +92,12 @@ impl OpCode {
                 no_further_params(self, &mut it)?;
                 Ok(Op::Filter(pattern))
             }
+            Self::Rename => {
+                let pattern = consume_param(self, "pattern", &mut it)?;
+                let replacement = consume_param(self, "replacement", &mut it)?;
+                no_further_params(self, &mut it)?;
+                Ok(Op::Rename(pattern, replacement))
+            }
             Self::Download => {
                 let url = consume_param(self, "url", &mut it)?;
                 let hash = consume_param(self, "hash", &mut it)?;
@@ -119,6 +127,7 @@ impl OpCode {
             "--merge" => Some(Self::Merge),
             "--prefix" => Some(Self::Prefix),
             "--filter" => Some(Self::Filter),
+            "--rename" => Some(Self::Rename),
             "--download" => Some(Self::Download),
             "--download-impure" => Some(Self::DownloadImpure),
             "--cmd-impure" => Some(Self::CmdImpure),
@@ -136,6 +145,7 @@ impl Op {
             Self::Merge => OpCode::Merge,
             Self::Prefix(_) => OpCode::Prefix,
             Self::Filter(_) => OpCode::Filter,
+            Self::Rename(_, _) => OpCode::Rename,
             Self::Download(_, _) => OpCode::Download,
             Self::DownloadImpure(_) => OpCode::DownloadImpure,
             Self::CmdImpure(_) => OpCode::CmdImpure,

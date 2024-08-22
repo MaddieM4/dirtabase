@@ -149,6 +149,31 @@ impl OpCode {
                     },
                 }],
             },
+            OpCode::Rename => OpDoc {
+                flag: "--rename",
+                args: " pattern replacement",
+                short: "Rename files and directories within the top archive on the stack.",
+                examples: vec![ExamplePipeline {
+                    as_txt: vec![
+                        "--import", ".", "fixture", "--rename", "root", "boot", "--export", "./out",
+                    ],
+                    as_ops: vec![
+                        Op::Import {
+                            base: ".".into(),
+                            targets: vec!["fixture".into()],
+                        },
+                        Op::Rename("root".into(), "boot".into()),
+                        Op::Export("./out".into()),
+                    ],
+                    as_ctx: &|ctx: &mut Context| {
+                        ctx.import(".", ["fixture"])?
+                            .rename("root", "boot")?
+                            .export("./out")?;
+                        assert!(Path::new("./out/fixture/file_at_boot.txt").exists());
+                        Ok(())
+                    },
+                }],
+            },
             OpCode::Download => OpDoc {
                 flag: "--download",
                 args: " url digest",

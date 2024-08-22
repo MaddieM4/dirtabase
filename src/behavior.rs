@@ -115,7 +115,7 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
             ctx.push(ark.save(ctx.db)?);
         }
         Op::Prefix(prefix) => {
-            assert_eq!(consumed.len(), 1, "Export consumes 1 archive off the stack");
+            assert_eq!(consumed.len(), 1, "Prefix consumes 1 archive off the stack");
             let digest = consumed[0];
             let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
 
@@ -129,6 +129,21 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
                 })
                 .collect();
             let ark = Ark::compose(std::rc::Rc::new(p), a, c);
+            ctx.push(ark.save(ctx.db)?)
+        }
+        Op::Rename(pattern, replacement) => {
+            assert_eq!(consumed.len(), 1, "Rename consumes 1 archive off the stack");
+            let digest = consumed[0];
+            let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
+
+            let re = regex::Regex::new(pattern).map_err(|e| Error::other(e))?;
+            let entries: Vec<(IPR, Attrs, Contents<Digest>)> = ark
+                .to_entries()
+                .into_iter()
+                .map(|(p, a, c)| (re.replace(p.as_ref(), replacement).as_ref().to_ipr(), a, c))
+                .collect();
+
+            let ark = Ark::from_entries(entries);
             ctx.push(ark.save(ctx.db)?)
         }
         Op::Filter(pattern) => {
@@ -208,6 +223,18 @@ impl Context<'_> {
 
     pub fn filter(&mut self, pattern: impl AsRef<str>) -> Result<&mut Self> {
         self.apply(&Op::Filter(pattern.as_ref().to_owned()))?;
+        Ok(self)
+    }
+
+    pub fn rename(
+        &mut self,
+        pattern: impl AsRef<str>,
+        replacement: impl AsRef<str>,
+    ) -> Result<&mut Self> {
+        self.apply(&Op::Rename(
+            pattern.as_ref().to_owned(),
+            replacement.as_ref().to_owned(),
+        ))?;
         Ok(self)
     }
 
