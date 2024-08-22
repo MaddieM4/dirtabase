@@ -82,9 +82,23 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
         }
         Op::Export(base) => {
             assert_eq!(consumed.len(), 1, "Export consumes 1 archive off the stack");
+            let base = Path::new(base);
+            let parent = base.parent().ok_or_else(|| {
+                std::io::Error::other("Can't create tempdir to the side of output location")
+            })?;
+
             let digest = consumed[0];
             let ark: Ark<Digest> = Ark::load(ctx.db, &digest)?;
-            ark.write(ctx.db, Path::new(base))?;
+            let tmp = tempfile::tempdir_in(parent)?;
+            ark.write(ctx.db, &tmp)?;
+
+            if base.exists() {
+                std::fs::rename(&base, parent.join(".tmp-remove-me"))?;
+                std::fs::rename(&tmp, &base)?;
+                std::fs::remove_dir_all(parent.join(".tmp-remove-me"))?;
+            } else {
+                std::fs::rename(&tmp, &base)?;
+            }
         }
         Op::Merge => {
             let arks: Result<Vec<Ark<Digest>>> = consumed
@@ -245,6 +259,23 @@ mod test {
             &vec![],
         )?;
         assert_eq!(ctx.stack, vec![fixture_digest()]);
+        Ok(())
+    }
+
+    #[test]
+    fn export() -> std::io::Result<()> {
+        let db = DB::new_temp()?;
+        let mut log = Logger::new_vec();
+        let mut ctx = Context::new(&db, &mut log);
+        ctx.import(".", ["src", "fixture"])?; // Stack up two
+
+        ctx.export("out")?; // Emit "fixture"
+        assert!(Path::new("out/fixture").exists());
+        assert!(!Path::new("out/src").exists());
+
+        ctx.export("out")?; // Emit "src", COMPLETELY REPLACING EXISTING DIR
+        assert!(!Path::new("out/fixture").exists());
+        assert!(Path::new("out/src").exists());
         Ok(())
     }
 }
