@@ -2,6 +2,11 @@
 name = "dirtabase"
 version = "0.8.21"
 edition = "2021"
+license = "GPL-3.0-only"
+
+description = "Reproducible build tool for software."
+repository = "https://github.com/MaddieM4/dirtabase"
+readme = "README.md"
 
 [profile.profiling]
 inherits = "release"
