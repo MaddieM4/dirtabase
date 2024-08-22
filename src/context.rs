@@ -92,6 +92,11 @@ impl ReadyStep {
     }
     pub fn can_cache(&self) -> bool {
         match self.0 {
+            Op::Empty => true,
+            Op::Merge => true,
+            Op::Prefix(_) => true,
+            Op::Rename(_, _) => true,
+            Op::Filter(_) => true,
             Op::Download(_, _) => true,
             _ => false,
         }
