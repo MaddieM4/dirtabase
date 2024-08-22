@@ -163,7 +163,11 @@ pub fn exec_step(ctx: &mut Context, op: &Op, consumed: &Vec<Digest>) -> Result<(
         Op::Download(url, digest_expected) => {
             let digest = download(ctx.db, &url)?;
             if digest != *digest_expected {
-                return Err(Error::other("Hash check failed"));
+                return Err(Error::other(format!(
+                    "Hash check failed. Expected {}, got {}",
+                    digest_expected.to_hex(),
+                    digest.to_hex()
+                )));
             }
             ctx.push(digest);
         }
